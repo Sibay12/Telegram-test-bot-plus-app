@@ -101,9 +101,7 @@ async function notifyAdminDirect(messageText) {
             const tempBot = new TelegramBot(ADMIN_BOT_TOKEN, { polling: false });
             await tempBot.sendMessage(ADMIN_CHAT_ID, messageText, { parse_mode: 'Markdown' });
         }
-    } catch (e) {
-        debugLog('AdminNotify', 'Error sending admin notice:', e.message);
-    }
+    } catch (e) {}
 }
 
 async function createInstaPaymentLink(chatId, baseAmount, reaches) {
@@ -143,7 +141,6 @@ async function createInstaPaymentLink(chatId, baseAmount, reaches) {
                     if (response.statusCode === 201 && json.success) {
                         resolve(json.payment_request.longurl);
                     } else {
-                        debugLog('Instamojo', 'Payment link failed:', json);
                         resolve(null);
                     }
                 } catch(e) { resolve(null); }
@@ -157,7 +154,7 @@ async function createInstaPaymentLink(chatId, baseAmount, reaches) {
 function startCustomerBot(token, isPrimary) {
     try {
         const bot = new TelegramBot(token, { polling: true });
-        bot.on('polling_error', (err) => debugLog('CustomerBotPolling', err.message));
+        bot.on('polling_error', () => {});
 
         bot.getMe().then(info => {
             if (isPrimary && !primaryCustomerBotUsername) {
@@ -171,25 +168,27 @@ function startCustomerBot(token, isPrimary) {
             if (chatId === ADMIN_CHAT_ID) return;
 
             const text = msg.text.trim();
-            debugLog('CustomerBot', `Message from ${chatId}: ${text}`);
 
             if (text.startsWith('/start')) {
                 let user = await UserModel.findOne({ telegramChatId: chatId });
                 if (!user) {
                     user = await UserModel.create({ telegramChatId: chatId, name: msg.from.first_name || 'User', reaches: 0 });
+                    await notifyAdminDirect(`👤 **NEW USER REGISTERED VIA BOT**\n💬 Telegram ID: \`${chatId}\`\n📌 Name: ${msg.from.first_name || 'User'}`);
                 }
 
-                const webAppKeyboard = {
+                const portalUrl = serverPublicUrl || "https://jpw-portal.onrender.com";
+                const welcomeMessage = `✨ **Welcome to JPW Public Reach Service!** 🚀\n\n🆔 **Your Web Login ID / Chat ID:** \`${chatId}\`\n\n🔗 **Direct Mini App Portal Link:**\n${portalUrl}\n\n📝 **Order Format:** आर्डर देने के लिए सीधे चैट में भेजें: \`TARGET_ID PASSWORD\` (जैसे: \`1234567890 mypass\`)`;
+
+                const keyboard = {
                     reply_markup: {
                         inline_keyboard: [
-                            [{ text: "🚀 Open Mini App Portal", web_app: { url: serverPublicUrl || "https://jpw-portal.onrender.com" } }],
                             [{ text: "🎬 Video Task (Coming Soon)", callback_data: "coming_soon" }],
-                            [{ text: "🔑 Get Web Login ID", callback_data: "get_web_id" }, { text: "💎 Check Balance", callback_data: "check_balance" }],
-                            [{ text: "📦 Recharge Packages", callback_data: "view_packages" }]
+                            [{ text: "💎 Check Balance", callback_data: "check_balance" }, { text: "📦 Recharge Packages", callback_data: "view_packages" }]
                         ]
                     }
                 };
-                bot.sendMessage(chatId, `✨ **Welcome to JPW Public Reach Service!** 🚀\n\n🆔 **Your Web Login ID:** \`${chatId}\`\n\n📝 **Order Format:** आर्डर देने के लिए सीधे चैट में भेजें: \`TARGET_ID PASSWORD\` (जैसे: \`1234567890 mypass\`)`, { parse_mode: 'Markdown', ...webAppKeyboard });
+
+                bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown', ...keyboard });
                 return;
             }
 
@@ -211,7 +210,6 @@ function startCustomerBot(token, isPrimary) {
                 await notifyAdminAndUser(newOrder, user, `🌐 **NEW BOT ORDER (Pending)**\n💬 Telegram ID: \`${chatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
 
                 bot.sendMessage(chatId, `📦 **Order Submitted Successfully!** 🚀\n\n🎯 Target ID: \`${targetId}\`\n📌 Status: *Pending ⏳*\n💎 Remaining Balance: *${user.reaches} Reaches*`);
-                debugLog('BotOrder', `Order placed by ${chatId} for ${targetId}`);
                 return;
             }
         });
@@ -223,9 +221,6 @@ function startCustomerBot(token, isPrimary) {
 
             if (data === 'coming_soon') {
                 bot.answerCallbackQuery(query.id, { text: '⏳ Coming Soon! This feature is under development.', show_alert: true });
-            } else if (data === 'get_web_id') {
-                bot.answerCallbackQuery(query.id, { text: `Your Web Login ID is ${chatId}` });
-                bot.sendMessage(chatId, `🔑 **Your Web Login ID:** \`${chatId}\``, { parse_mode: 'Markdown' });
             } else if (data === 'check_balance') {
                 const bal = user ? user.reaches : 0;
                 bot.answerCallbackQuery(query.id, { text: `Your Balance: ${bal} Reaches` });
@@ -249,22 +244,25 @@ function startCustomerBot(token, isPrimary) {
                 }
             }
         });
-    } catch (e) {
-        debugLog('CustomerBotInit', e.message);
-    }
+    } catch (e) {}
 }
 
 function startAdminBot(token) {
     try {
         const bot = new TelegramBot(token, { polling: true });
-        bot.on('polling_error', (err) => debugLog('AdminBotPolling', err.message));
+        bot.on('polling_error', () => {});
 
         bot.on('message', async (msg) => {
             if (!msg || !msg.chat || !msg.text) return;
             const chatId = String(msg.chat.id);
-            if (chatId !== ADMIN_CHAT_ID) return;
-
             const text = msg.text.trim();
+
+            if (text.startsWith('/start') && chatId === ADMIN_CHAT_ID) {
+                bot.sendMessage(chatId, `👑 **Welcome Admin to JPW Control Bot!**\n\nसारे नए ऑर्डर्स और नोटिफिकेशन्स आपको यहीं मिलेंगे।`, { parse_mode: 'Markdown' });
+                return;
+            }
+
+            if (chatId !== ADMIN_CHAT_ID) return;
 
             if (adminPendingReply[chatId]) {
                 const orderId = adminPendingReply[chatId];
@@ -277,7 +275,6 @@ function startAdminBot(token) {
 
                     await notifyCustomerOnly(order, await UserModel.findOne({ telegramChatId: order.telegramChatId }), `💬 **ADMIN REPLY FOR YOUR ORDER**\n🎯 Target ID: \`${order.targetId}\`\n\n📢 *${text}*`);
                     bot.sendMessage(chatId, `✅ Reply successfully sent to the customer!`);
-                    debugLog('AdminReply', `Reply sent for order ${orderId}`);
                 } else {
                     bot.sendMessage(chatId, `❌ Order not found!`);
                 }
@@ -295,7 +292,6 @@ function startAdminBot(token) {
                     } catch(e) {}
                 }
                 bot.sendMessage(chatId, `✅ Broadcast successfully sent to ${count} users!`);
-                debugLog('Broadcast', `Broadcast sent to ${count} users`);
                 return;
             }
         });
@@ -348,31 +344,19 @@ function startAdminBot(token) {
 
             await order.save();
             bot.answerCallbackQuery(query.id, { text: `Status updated!` });
-            debugLog('AdminAction', `Order ${orderId} status changed to ${order.status}`);
 
             try {
-                if (order.status === 'Completed' || order.status === 'Rejected' || order.status.includes('Cancelled')) {
-                    await bot.editMessageText(`📢 **ORDER ${order.status.toUpperCase()}**\n🎯 Target ID: \`${order.targetId}\`\n📌 Status: *${statusMsg}*`, {
-                        chat_id: chatId,
-                        message_id: query.message.message_id,
-                        parse_mode: 'Markdown',
-                        reply_markup: { inline_keyboard: [] }
-                    });
-                } else {
-                    await bot.editMessageText(`📢 **ORDER STATUS UPDATED**\n🎯 Target ID: \`${order.targetId}\`\n📌 Status: *${statusMsg}*`, {
-                        chat_id: chatId,
-                        message_id: query.message.message_id,
-                        parse_mode: 'Markdown',
-                        reply_markup: query.message.reply_markup
-                    });
-                }
+                await bot.editMessageText(`📢 **ORDER STATUS UPDATED**\n🎯 Target ID: \`${order.targetId}\`\n📌 Status: *${statusMsg}*`, {
+                    chat_id: chatId,
+                    message_id: query.message.message_id,
+                    parse_mode: 'Markdown',
+                    reply_markup: { inline_keyboard: [] }
+                });
             } catch(e) {}
 
             await notifyCustomerOnly(order, user, `📢 **ORDER STATUS UPDATE** 🌟\n\n🎯 **Target ID:** \`${order.targetId}\`\n\n${customerEmojiMsg}\n\n💎 Balance: *${user ? user.reaches : 0} Reaches*`);
         });
-    } catch (e) {
-        debugLog('AdminBotInit', e.message);
-    }
+    } catch (e) {}
 }
 
 async function notifyCustomerOnly(order, user, messageText) {
@@ -422,8 +406,9 @@ app.post('/api/send-otp', async (req, res) => {
 
         telegramChatId = String(telegramChatId).trim();
         let user = await UserModel.findOne({ telegramChatId });
+        
         if (!user) {
-            return res.json({ success: false, message: 'User not found! Please start bot first.' });
+            return res.json({ success: false, message: 'User not registered! Please start bot first.' });
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -434,10 +419,8 @@ app.post('/api/send-otp', async (req, res) => {
             await tempBot.sendMessage(telegramChatId, `🔐 **JPW Portal Login OTP:** \`${otp}\`\n\nयह OTP केवल 5 मिनट के लिए वैध है।`, { parse_mode: 'Markdown' });
         }
 
-        debugLog('OTP', `OTP sent to ${telegramChatId}`);
         res.json({ success: true, message: 'OTP sent!' });
     } catch (err) {
-        debugLog('OTPErr', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -461,7 +444,6 @@ app.post('/api/verify-otp', async (req, res) => {
         delete otpStorage[telegramChatId];
         let user = await UserModel.findOne({ telegramChatId });
 
-        debugLog('Auth', `User verified via OTP: ${telegramChatId}`);
         res.json({ success: true, user });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -476,7 +458,7 @@ app.post('/api/mini-app/auth', async (req, res) => {
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
         if (!user) {
             user = await UserModel.create({ telegramChatId: String(telegramChatId), name: name || 'User', reaches: 0 });
-            await notifyAdminDirect(`👤 **NEW USER REGISTERED**\n💬 Telegram ID: \`${telegramChatId}\`\n📌 Name: ${name}`);
+            await notifyAdminDirect(`👤 **NEW MINI APP USER**\n💬 Telegram ID: \`${telegramChatId}\`\n📌 Name: ${name}`);
         }
 
         res.json({ success: true, user });
@@ -489,7 +471,6 @@ app.post('/api/admin/login', (req, res) => {
     try {
         const { password } = req.body;
         if (password === ADMIN_SECRET_PASS) {
-            debugLog('Admin', 'Admin logged into portal successfully');
             return res.json({ success: true });
         } else {
             return res.json({ success: false, message: 'Incorrect Password!' });
@@ -499,7 +480,6 @@ app.post('/api/admin/login', (req, res) => {
     }
 });
 
-// 📊 एडमिन पोर्टल पर लाइव लॉग्स दिखाने की API
 app.get('/api/admin/logs', (req, res) => {
     try {
         const logs = getRecentLogs();
@@ -518,7 +498,6 @@ app.post('/api/admin/clear-database', async (req, res) => {
         await UserModel.deleteMany({});
         await OrderModel.deleteMany({});
         await UsedUtrModel.deleteMany({});
-        debugLog('Admin', '⚠️ DATABASE WIPED CLEAN VIA PIN 9999');
         res.json({ success: true, message: 'Server database wiped clean successfully!' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -570,7 +549,6 @@ app.post('/api/pay', async (req, res) => {
                     if (response.statusCode === 201 && json.success) {
                         res.json({ success: true, paymentUrl: json.payment_request.longurl });
                     } else {
-                        debugLog('PaymentError', json);
                         res.json({ success: false, message: json.message || 'Payment failed' });
                     }
                 } catch(e) { res.status(500).json({ success: false, message: 'JSON Parse Error' }); }
@@ -590,7 +568,6 @@ app.post('/api/verify-instant', async (req, res) => {
         if (user) {
             user.reaches += parseInt(reaches);
             await user.save();
-            debugLog('InstantVerify', `Added ${reaches} reaches to ${telegramChatId}`);
             res.json({ success: true, user });
         } else {
             res.json({ success: false, message: 'User not found' });
@@ -617,7 +594,6 @@ app.post('/api/order', async (req, res) => {
 
         await notifyCustomerOnly(newOrder, user, `📦 **ORDER PLACED SUCCESSFULLY!** 🚀✨\n\n🎯 **Target ID:** \`${targetId}\`\n📌 **Status:** *Pending ⏳*\n\n💎 Remaining Balance: *${user.reaches} Reaches*`);
 
-        debugLog('WebOrder', `Order placed for ${targetId} by ${telegramChatId}`);
         res.json({ success: true, message: 'Order submitted successfully!', remainingReaches: user.reaches });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -652,7 +628,6 @@ app.post('/api/admin/update-reaches', async (req, res) => {
             user.reaches = Math.max(0, user.reaches - amount);
         }
         await user.save();
-        debugLog('AdminReaches', `Updated reaches for user ${userId}: ${action} ${amount}`);
         res.json({ success: true, message: `Reaches updated! Balance: ${user.reaches}` });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -688,7 +663,6 @@ app.post('/api/admin/order-action', async (req, res) => {
         }
 
         await order.save();
-        debugLog('AdminOrderAction', `Order ${orderId} action: ${action}`);
         await notifyAdminAndUser(order, user, `📢 **ORDER STATUS UPDATE**\n🎯 Target ID: \`${order.targetId}\`\n📌 Status: *${statusMsg}*`);
 
         res.json({ success: true, message: `Order status updated to: ${order.status}` });
@@ -701,7 +675,6 @@ app.post('/api/admin/delete-user', async (req, res) => {
     try {
         const { userId } = req.body;
         await UserModel.findByIdAndDelete(userId);
-        debugLog('AdminUserDelete', `Deleted user ID: ${userId}`);
         res.json({ success: true, message: 'Customer deleted!' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -730,15 +703,12 @@ app.post('/instamojo-webhook', async (req, res) => {
                     if (user) {
                         user.reaches += reachesToAdd;
                         await user.save();
-                        debugLog('Webhook', `Payment success: +${reachesToAdd} for ${telegramChatId}`);
                         await notifyCustomerOnly(null, user, `💳 **PAYMENT SUCCESSFUL!** 🎉✨\n\n✨ Added: \`+${reachesToAdd} Reaches\` 🚀\n💰 **New Total Balance:** \`${user.reaches} Reaches\` 💎`);
                     }
                 }
             }
         }
-    } catch (err) {
-        debugLog('WebhookErr', err.message);
-    }
+    } catch (err) {}
 });
 
 const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
