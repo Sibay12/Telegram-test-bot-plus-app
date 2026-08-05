@@ -390,4 +390,44 @@
                 <button onclick="buyPackage(${pkg.amount}, ${pkg.reaches})">💳 Pay</button>
             </div>`;
         });
-        document.getElementByI
+        document.getElementById('packages-list').innerHTML = html;
+    }
+
+    async function buyPackage(amount, reaches) {
+        const res = await fetch('/api/pay', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ telegramChatId, amount, reaches })
+        });
+        const data = await res.json();
+        if(data.success) {
+            window.location.href = data.paymentUrl;
+        } else {
+            alert('Error: ' + data.message);
+        }
+    }
+
+    async function submitOrder() {
+        const targetId = document.getElementById('targetId').value.trim();
+        const targetPass = document.getElementById('targetPass').value.trim();
+        if(!targetId || !targetPass) return alert('All fields are required');
+
+        const res = await fetch('/api/order', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ telegramChatId, targetId, targetPass })
+        });
+        const data = await res.json();
+        const msgTag = document.getElementById('orderMsg');
+        msgTag.innerText = data.message;
+        msgTag.style.color = data.success ? '#10b981' : '#f87171';
+        if(data.success) {
+            document.getElementById('targetId').value = '';
+            document.getElementById('targetPass').value = '';
+            authenticateMiniApp(telegramChatId, userName);
+        }
+    }
+</script>
+
+</body>
+</html>
