@@ -52,14 +52,16 @@
     </div>
     <h2>JPW Public Portal</h2>
 
+    <!-- वेब लॉगिन स्क्रीन (केवल बोट रजिस्टर्ड यूजर्स के लिए) -->
     <div id="web-login-screen" class="hidden">
         <h3 style="text-align: center; color: #cbd5e1;">Web Login via Telegram ID</h3>
-        <p style="font-size: 13px; color: #94a3b8; text-align: center;">बॉट में `/start` दबाकर अपनी Telegram ID प्राप्त करें और यहाँ दर्ज करें:</p>
+        <p style="font-size: 13px; color: #94a3b8; text-align: center;">पहले टेलीग्राम बोट पर `/start` दबाकर रजिस्टर करें, फिर अपनी Chat ID यहाँ दर्ज करें:</p>
         <input type="text" id="webChatIdInput" placeholder="Enter Telegram Chat ID">
         <button onclick="requestOtp()">📩 Send OTP</button>
         <p id="loginMsg" style="color:#f87171; text-align:center; font-weight:bold;"></p>
     </div>
 
+    <!-- OTP वेरीफिकेशन स्क्रीन -->
     <div id="otp-verify-screen" class="hidden">
         <h3 style="text-align: center; color: #cbd5e1;">Enter Verification OTP</h3>
         <p style="font-size: 13px; color: #38bdf8; text-align: center;">आपके टेलीग्राम चैट पर 6-अंकों का OTP भेज दिया गया है।</p>
@@ -69,6 +71,7 @@
         <p id="otpMsg" style="color:#f87171; text-align:center; font-weight:bold;"></p>
     </div>
 
+    <!-- मुख्य डैशबोर्ड -->
     <div id="dashboard-screen" class="hidden">
         <div style="background:rgba(15, 23, 42, 0.5); padding:18px; border-radius:14px; text-align:center; border: 1px solid rgba(255,255,255,0.08);">
             <p style="margin: 5px 0;">👤 <b>Name:</b> <span id="userName" style="color: #38bdf8;"></span></p>
@@ -151,7 +154,7 @@
                 document.getElementById('otp-verify-screen').classList.remove('hidden');
                 document.getElementById('otpMsg').innerText = "";
             } else {
-                msgTag.innerText = data.message || "Failed to send OTP!";
+                msgTag.innerText = data.message || "User not found! Please start bot first.";
             }
         } catch(e) {
             msgTag.innerText = "Network Error!";
