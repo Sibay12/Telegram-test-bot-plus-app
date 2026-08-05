@@ -1,0 +1,18 @@
+{
+  "name": "jpw-reach-bot",
+  "version": "2.9.0",
+  "description": "JPW Public Reach and Automation Bot System - Interactive Button Transfer & UX Edition",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.3.1",
+    "node-telegram-bot-api": "^0.66.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
