@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JPW Engineer Mobile Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #050b14; color: #f8fafc; font-family: sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border: 1px solid #334155; }
+    </style>
+</head>
+<body class="p-4 flex items-center justify-center min-h-screen">
+
+<div class="w-full max-w-md glass p-6 rounded-3xl shadow-2xl">
+    <div class="text-center mb-6">
+        <h2 class="text-2xl font-black text-sky-400 tracking-wider">JPW PORTAL</h2>
+        <p class="text-xs text-slate-400 mt-1">Engineer Mobile & Status Dashboard</p>
+    </div>
+
+    <!-- Auth Container (Login / Register) -->
+    <div id="auth-container">
+        <div class="flex gap-2 mb-4 bg-slate-900 p-1 rounded-2xl border border-slate-800">
+            <button onclick="switchTab('login')" id="tabL" class="flex-1 py-2.5 rounded-xl font-bold text-sm bg-sky-500 text-white transition">Login</button>
+            <button onclick="switchTab('register')" id="tabR" class="flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 transition">Register</button>
+        </div>
+        
+        <!-- Login Form -->
+        <div id="loginForm">
+            <input type="text" id="logId" placeholder="10-Digit Custom ID" class="w-full p-3.5 mb-3 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-sky-500">
+            <input type="password" id="logPass" placeholder="Password" class="w-full p-3.5 mb-4 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-sky-500">
+            <button onclick="appLogin()" class="w-full py-3.5 bg-sky-600 hover:bg-sky-500 font-bold rounded-xl shadow-lg shadow-sky-600/30 transition">Login to Portal</button>
+        </div>
+
+        <!-- Register Form -->
+        <div id="regForm" class="hidden">
+            <input type="text" id="regName" placeholder="Your Full Name" class="w-full p-3 mb-3 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-emerald-500">
+            <input type="text" id="regId" placeholder="Choose 10-Digit ID" class="w-full p-3 mb-3 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-emerald-500">
+            <input type="password" id="regPass" placeholder="Create Password" class="w-full p-3 mb-4 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-emerald-500">
+            <button onclick="appRegister()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl shadow-lg shadow-emerald-600/30 transition">Create Account</button>
+        </div>
+    </div>
+
+    <!-- Dashboard (After Login) -->
+    <div id="app-dashboard" class="hidden">
+        <div class="mb-4 p-4 bg-slate-900 rounded-2xl border border-slate-800 text-center">
+            <p class="text-xs text-slate-400">Welcome back,</p>
+            <p id="dName" class="text-lg font-black text-sky-400 mt-0.5"></p>
+            <p class="text-[10px] text-slate-500 mt-1">Chat ID: <span id="dChatId"></span></p>
+            
+            <div class="flex gap-2 mt-4">
+                <button onclick="fetchStatus()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold transition shadow-md">🔄 Refresh Status</button>
+                <a href="tel:7659178694" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold flex items-center justify-center transition shadow-md">📞 Support</a>
+            </div>
+            <button onclick="logout()" class="mt-3 text-[11px] text-red-400 hover:underline">Logout from device</button>
+        </div>
+
+        <div class="flex justify-between items-center mb-2">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Live Order Status Tracker</h3>
+            <span class="text-[10px] bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20">Real-time</span>
+        </div>
+        
+        <div id="statusList" class="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+            <!-- Dynamic Status Cards will load here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // Check if already logged in on load
+    window.onload = () => {
+        const savedId = localStorage.getItem('cid');
+        const savedChatId = localStorage.getItem('chatid');
+        if(savedId && savedChatId) {
+            showDash({ customId: savedId, telegramChatId: savedChatId });
+        }
+    };
+
+    function switchTab(t) {
+        document.getElementById('loginForm').classList.toggle('hidden', t !== 'login');
+        document.getElementById('regForm').classList.toggle('hidden', t !== 'register');
+        
+        document.getElementById('tabL').className = t === 'login' ? 'flex-1 py-2.5 rounded-xl font-bold text-sm bg-sky-500 text-white transition' : 'flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 transition';
+        document.getElementById('tabR').className = t === 'register' ? 'flex-1 py-2.5 rounded-xl font-bold text-sm bg-emerald-600 text-white transition' : 'flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 transition';
+    }
+
+    async function appLogin() {
+        const customId = document.getElementById('logId').value.trim();
+        const password = document.getElementById('logPass').value.trim();
+        if(!customId || !password) return alert('Please enter ID and Password!');
+
+        const res = await fetch('/api/login', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({ customId, password }) 
+        });
+        const data = await res.json();
+        
+        if(data.success) {
+            localStorage.setItem('cid', data.user.customId);
+            localStorage.setItem('chatid', data.user.telegramChatId);
+            showDash(data.user);
+        } else {
+            alert(data.message || 'Login failed!');
+        }
+    }
+
+    async function appRegister() {
+        const name = document.getElementById('regName').value.trim();
+        const customId = document.getElementById('regId').value.trim();
+        const password = document.getElementById('regPass').value.trim();
+        if(!name || !customId || !password) return alert('Please fill all fields!');
+
+        const res = await fetch('/api/register', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({ customId, password, name }) 
+        });
+        const data = await res.json();
+        alert(data.message);
+        if(data.success) switchTab('login');
+    }
+
+    function showDash(user) {
+        document.getElementById('auth-container').classList.add('hidden');
+        document.getElementById('app-dashboard').classList.remove('hidden');
+        document.getElementById('dName').innerText = user.customId || user.name;
+        document.getElementById('dChatId').innerText = user.telegramChatId;
+        fetchStatus();
+    }
+
+    function logout() {
+        localStorage.clear();
+        location.reload();
+    }
+
+    async function fetchStatus() {
+        const chatId = localStorage.getItem('chatid');
+        if(!chatId) return;
+
+        const listDiv = document.getElementById('statusList');
+        listDiv.innerHTML = '<p class="text-center text-xs text-slate-500 py-4">Loading updates...</p>';
+
+        try {
+            const res = await fetch('/api/app/check-status', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ telegramChatId: chatId }) 
+            });
+            const data = await res.json();
+            
+            let html = '';
+            
+            // Render Regular Reach Orders
+            if(data.regularOrders && data.regularOrders.length > 0) {
+                data.regularOrders.forEach(o => {
+                    let badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                    if(o.status === 'Completed') badgeColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+                    if(o.status === 'Rejected') badgeColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+                    if(o.status === 'In Progress') badgeColor = 'bg-sky-500/20 text-sky-400 border-sky-500/30';
+
+                    html += `
+                        <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="font-bold text-slate-300">⚡ Reach ID: ${o.targetId}</span>
+                                <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeColor}">${o.status}</span>
+                            </div>
+                            ${o.adminReply ? `<div class="mt-2 p-2 bg-slate-800/80 rounded-lg text-sky-300 border-l-2 border-sky-400">💬 <b>Admin Note:</b> ${o.adminReply}</div>` : ''}
+                            <div class="text-[10px] text-slate-500 mt-1.5 text-right">${new Date(o.createdAt).toLocaleString()}</div>
+                        </div>`;
+                });
+            }
+
+            // Render SR Orders
+            if(data.srOrders && data.srOrders.length > 0) {
+                data.srOrders.forEach(s => {
+                    let badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                    if(s.status === 'Completed') badgeColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+                    if(s.status === 'Rejected') badgeColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+                    if(s.status === 'In Progress') badgeColor = 'bg-sky-500/20 text-sky-400 border-sky-500/30';
+
+                    let repliesHtml = '';
+                    if(s.adminReplies && s.adminReplies.length > 0) {
+                        s.adminReplies.forEach(rep => {
+                            repliesHtml += `<div class="mt-1.5 p-2 bg-slate-800/80 rounded-lg text-emerald-300 border-l-2 border-emerald-400">💬 <b>Reply:</b> ${rep}</div>`;
+                        });
+                    }
+
+                    html += `
+                        <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="font-bold text-slate-300">📌 SR: ${s.customerName} (${s.mobileNumber})</span>
+                                <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeColor}">${s.status}</span>
+                            </div>
+                            ${repliesHtml}
+                            <div class="text-[10px] text-slate-500 mt-1.5 text-right">${new Date(s.createdAt).toLocaleString()}</div>
+                        </div>`;
+                });
+            }
+
+            listDiv.innerHTML = html || '<div class="text-center py-6 text-slate-500 text-xs">No orders found yet!</div>';
+        } catch (e) {
+            listDiv.innerHTML = '<p class="text-center text-xs text-red-400 py-4">Failed to fetch status.</p>';
+        }
+    }
+</script>
+</body>
+</html>
