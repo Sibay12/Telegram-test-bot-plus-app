@@ -38,13 +38,13 @@ const CUSTOMER_BOT_TOKENS = [
 // 👑 Your Dedicated Admin Bot Token
 const ADMIN_BOT_TOKEN = '8736759061:AAGaSKOCQ9gUylCsqdAufHenEPeDQhQtSDU';
 
-// 📦 Updated Recharge Packages with Tax & Settlement Buffer
+// 📦 Updated Recharge Packages (Buying JPW Coins)
 const RECHARGE_PACKAGES = [
-    { amount: 15, reaches: 1 },
-    { amount: 65, reaches: 5 },
-    { amount: 125, reaches: 10 },
-    { amount: 235, reaches: 20 },
-    { amount: 425, reaches: 40 }
+    { amount: 15, coins: 1 },
+    { amount: 65, coins: 5 },
+    { amount: 125, coins: 10 },
+    { amount: 235, coins: 20 },
+    { amount: 425, coins: 40 }
 ];
 
 let otpStorage = {};
@@ -73,6 +73,7 @@ const userSchema = new mongoose.Schema({
     name: { type: String, default: 'User' },
     phone: { type: String, default: '' },
     reaches: { type: Number, default: 0 },
+    jpwCoins: { type: Number, default: 0 }, // 🪙 JPW Coins Balance
     activePackage: { type: String, default: 'No active package' },
     lastBonusTime: { type: Date, default: null },
     referredBy: { type: String, default: null },
@@ -236,7 +237,7 @@ function startAdminBot(token) {
             if (text === "🎁 Split Giveaway") {
                 adminPendingGiveaway = true;
                 adminPendingBroadcast = false;
-                bot.sendMessage(chatId, `🎁 **Split Giveaway Mode Active!**\nSend the total amount to split equally among all users:`, { parse_mode: 'Markdown' });
+                bot.sendMessage(chatId, `🎁 **Split Giveaway Mode Active!**\nSend the total coins to split equally among all users:`, { parse_mode: 'Markdown' });
                 return;
             }
 
@@ -249,8 +250,8 @@ function startAdminBot(token) {
 
             if (adminPendingGiveaway) {
                 adminPendingGiveaway = false;
-                const totalAmount = parseFloat(text);
-                if (isNaN(totalAmount) || totalAmount <= 0) {
+                const totalCoins = parseFloat(text);
+                if (isNaN(totalCoins) || totalCoins <= 0) {
                     bot.sendMessage(chatId, `❌ Invalid amount! Please click the button again.`);
                     return;
                 }
@@ -261,17 +262,17 @@ function startAdminBot(token) {
                     return;
                 }
 
-                const splitAmount = totalAmount / allUsers.length;
+                const splitCoins = totalCoins / allUsers.length;
                 let successCount = 0;
                 for (let u of allUsers) {
-                    u.reaches += splitAmount;
+                    u.jpwCoins += splitCoins;
                     await u.save();
                     successCount++;
                     try {
-                        await bot.sendMessage(u.telegramChatId, `🎁 **Free Giveaway Split Alert!** 🎉\n\nAdmin has split a total of \`${totalAmount} Reaches\` among all users.\nYou received: \`+${splitAmount.toFixed(6)} Reaches\`! 💎\n\n*(JPW REACHED SERVICES BOT)*`, { parse_mode: 'Markdown' });
+                        await bot.sendMessage(u.telegramChatId, `🎁 **Free Giveaway Split Alert!** 🎉\n\nAdmin has split a total of \`${totalCoins} JPW Coins\` among all users.\nYou received: \`+${splitCoins.toFixed(4)} JPW Coins\`! 🪙\n\n*(JPW REACHED SERVICES BOT)*`, { parse_mode: 'Markdown' });
                     } catch(e) {}
                 }
-                bot.sendMessage(chatId, `✅ Successfully split **${totalAmount} Reaches** among **${successCount} users**!`);
+                bot.sendMessage(chatId, `✅ Successfully split **${totalCoins} JPW Coins** among **${successCount} users**!`);
                 return;
             }
 
@@ -334,9 +335,9 @@ function startAdminBot(token) {
                 customerEmojiMsg = '🎉 **Great News! Your order has been ACCEPTED!** ✅';
             } else if (action === 'reject') {
                 order.status = 'Rejected';
-                statusMsg = 'Rejected ❌ (Reach Refunded)';
-                if (user) { user.reaches += 1; await user.save(); }
-                customerEmojiMsg = '❌ **Order Rejected**\nYour Reach has been refunded! 🔄💎';
+                statusMsg = 'Rejected ❌ (1 Coin Refunded)';
+                if (user) { user.jpwCoins += 1; await user.save(); }
+                customerEmojiMsg = '❌ **Order Rejected**\nYour JPW Coin has been refunded! 🔄🪙';
             } else if (action === 'inprogress') {
                 order.status = 'In Progress';
                 statusMsg = 'In Progress ⏳';
@@ -347,9 +348,9 @@ function startAdminBot(token) {
                 customerEmojiMsg = '🎉 **Congratulations! Your order has been successfully completed!** 🏆✨';
             } else if (action === 'cancel' && !order.status.includes('Refunded')) {
                 order.status = 'Cancelled & Refunded';
-                statusMsg = 'Cancelled ❌ (Reach Refunded)';
-                if (user) { user.reaches += 1; await user.save(); }
-                customerEmojiMsg = '🚫 **Order Cancelled & Reach Refunded** 🔄💎';
+                statusMsg = 'Cancelled ❌ (1 Coin Refunded)';
+                if (user) { user.jpwCoins += 1; await user.save(); }
+                customerEmojiMsg = '🚫 **Order Cancelled & JPW Coin Refunded** 🔄🪙';
             }
 
             await order.save();
@@ -387,28 +388,29 @@ function startAdminBot(token) {
                 }
             } catch(e) {}
 
-            await notifyCustomerOnly(order, user, `📢 **Order Status Update** 🌟\n\n🎯 **Target ID:** \`${order.targetId}\`\n\n${customerEmojiMsg}\n\n💎 Balance: *${user ? user.reaches.toFixed(4) : 0} Reaches*`);
+            await notifyCustomerOnly(order, user, `📢 **Order Status Update** 🌟\n\n🎯 **Target ID:** \`${order.targetId}\`\n\n${customerEmojiMsg}\n\n🪙 Coins Balance: *${user ? user.jpwCoins.toFixed(2) : 0} JPW Coins*`);
         });
     } catch (e) {}
 }
 
 async function sendCustomerHomeMenu(bot, chatId, botUsername) {
     let user = await UserModel.findOne({ telegramChatId: chatId });
-    const bal = user ? user.reaches.toFixed(4) : "0.0000";
+    const coinsBal = user ? user.jpwCoins.toFixed(2) : "0.00";
+    const reachesBal = user ? user.reaches.toFixed(4) : "0.0000";
     const activePkg = user ? user.activePackage : "No active package";
 
     const portalUrl = serverPublicUrl || "https://cashtree.space";
     const referralLink = `https://t.me/${botUsername}?start=ref_${chatId}`;
     
-    const welcomeMessage = `✨ **Welcome to JPW REACHED SERVICES BOT!** 🚀\n\n🆔 **Your Web Login ID / Chat ID:** \`${chatId}\`\n\n🔗 **Direct Mini App Portal Link:**\n${portalUrl}\n\n👥 **Your Refer & Earn Link:**\n\`${referralLink}\`\n*(Win anywhere from 100 to 0.0001 Reach - For Marketing Purpose! When your friend makes a ₹100+ recharge)*\n\n📝 **Order Format:** Send directly in chat: \`TARGET_ID PASSWORD\`\n\n📦 **Your Active Package:** ${activePkg}\n💎 **Remaining Reaches:** ${bal} Reaches\n\n🤖 *JPW REACHED SERVICES BOT*\n💻 *Developed by tenaga technology*`;
+    const welcomeMessage = `✨ **Welcome to JPW REACHED SERVICES BOT!** 🚀\n\n🆔 **Your Web Login ID / Chat ID:** \`${chatId}\`\n\n🔗 **Direct Mini App Portal Link:**\n${portalUrl}\n\n👥 **Your Refer & Earn Link:**\n\`${referralLink}\`\n*(Win JPW Coins - When your friend makes a ₹100+ recharge)*\n\n📝 **Order Format:** Send directly in chat: \`TARGET_ID PASSWORD\` (Costs 1 JPW Coin)\n\n📦 **Active Package:** ${activePkg}\n🪙 **JPW Coins Balance:** ${coinsBal} Coins\n💎 **Reaches Balance:** ${reachesBal}\n\n🤖 *JPW REACHED SERVICES BOT*\n💻 *Developed by tenaga technology*`;
 
     const keyboard = {
         reply_markup: {
             inline_keyboard: [
                 [{ text: "🚀 Open Mini App Portal", web_app: { url: portalUrl } }],
-                [{ text: "🎁 Daily Bonus", callback_data: "claim_daily_bonus" }, { text: "🎬 Watch Ad / Spin", callback_data: "watch_ad_task" }],
-                [{ text: "🤝 Share Reach", callback_data: "start_reach_transfer" }, { text: "👥 Refer & Earn", callback_data: "show_referral_info" }],
-                [{ text: "💎 Check Balance", callback_data: "check_balance" }, { text: "📦 Recharge Packages", callback_data: "view_packages" }]
+                [{ text: "🎁 Daily Bonus", callback_data: "claim_daily_bonus" }, { text: "🔄 Convert Coins ➡️ Reaches", callback_data: "convert_coins" }],
+                [{ text: "🤝 Share Coins", callback_data: "start_reach_transfer" }, { text: "👥 Refer & Earn", callback_data: "show_referral_info" }],
+                [{ text: "🪙 Check Balance", callback_data: "check_balance" }, { text: "📦 Buy JPW Coins", callback_data: "view_packages" }]
             ]
         }
     };
@@ -448,6 +450,7 @@ function startCustomerBot(token, isPrimary) {
                     user = await UserModel.create({ 
                         telegramChatId: chatId, 
                         name: msg.from.first_name || 'User', 
+                        jpwCoins: 0,
                         reaches: 0,
                         referredBy: (referrerId && referrerId !== chatId) ? referrerId : null
                     });
@@ -462,7 +465,7 @@ function startCustomerBot(token, isPrimary) {
                 if (session.step === 'awaiting_receiver') {
                     session.receiverId = text;
                     session.step = 'awaiting_amount';
-                    bot.sendMessage(chatId, `✍️ How many reaches do you want to send? (Enter amount, e.g., \`2\` or \`0.5\`)`, { parse_mode: 'Markdown' });
+                    bot.sendMessage(chatId, `✍️ How many JPW Coins do you want to send? (Enter amount)`, { parse_mode: 'Markdown' });
                     return;
                 } else if (session.step === 'awaiting_amount') {
                     const amount = parseFloat(text);
@@ -476,14 +479,14 @@ function startCustomerBot(token, isPrimary) {
                     }
 
                     if (receiverId === chatId) {
-                        bot.sendMessage(chatId, `❌ You cannot send reaches to yourself!`);
+                        bot.sendMessage(chatId, `❌ You cannot send coins to yourself!`);
                         await sendCustomerHomeMenu(bot, chatId, activeBotUsername);
                         return;
                     }
 
                     let sender = await UserModel.findOne({ telegramChatId: chatId });
-                    if (!sender || sender.reaches < amount) {
-                        bot.sendMessage(chatId, `❌ Insufficient balance! You do not have enough reaches.`);
+                    if (!sender || sender.jpwCoins < amount) {
+                        bot.sendMessage(chatId, `❌ Insufficient JPW Coins balance!`);
                         await sendCustomerHomeMenu(bot, chatId, activeBotUsername);
                         return;
                     }
@@ -495,16 +498,16 @@ function startCustomerBot(token, isPrimary) {
                         return;
                     }
 
-                    sender.reaches -= amount;
-                    receiver.reaches += amount;
+                    sender.jpwCoins -= amount;
+                    receiver.jpwCoins += amount;
 
                     await sender.save();
                     await receiver.save();
 
-                    bot.sendMessage(chatId, `✅ **Reach Sent Successfully!**\nYou have successfully transferred ${amount} reaches.\nNew Balance: *${sender.reaches.toFixed(4)} Reaches*`, { parse_mode: 'Markdown' });
+                    bot.sendMessage(chatId, `✅ **JPW Coins Sent Successfully!**\nYou transferred ${amount} Coins.\nNew Balance: *${sender.jpwCoins.toFixed(2)} Coins*`, { parse_mode: 'Markdown' });
                     
                     try {
-                        await bot.sendMessage(receiverId, `🎁 **Reach Received Alert!** 🎉\n\nYou received \`+${amount} Reaches\` from ${sender.name || 'a user'} (${chatId})!\nNew Balance: *${receiver.reaches.toFixed(4)} Reaches* 💎\n\n*(JPW REACHED SERVICES BOT)*`, { parse_mode: 'Markdown' });
+                        await bot.sendMessage(receiverId, `🎁 **JPW Coins Received!** 🎉\n\nYou received \`+${amount} Coins\` from ${sender.name || 'a user'} (${chatId})!\nNew Balance: *${receiver.jpwCoins.toFixed(2)} Coins* 🪙`, { parse_mode: 'Markdown' });
                     } catch(e) {}
 
                     await sendCustomerHomeMenu(bot, chatId, activeBotUsername);
@@ -518,18 +521,18 @@ function startCustomerBot(token, isPrimary) {
                 const targetPass = parts.slice(1).join(' ');
 
                 let user = await UserModel.findOne({ telegramChatId: chatId });
-                if (!user || user.reaches < 1) {
-                    bot.sendMessage(chatId, `❌ **Insufficient Balance!** You need at least 1 Reach to submit an order.`);
+                if (!user || user.jpwCoins < 1) {
+                    bot.sendMessage(chatId, `❌ **Insufficient JPW Coins!** You need at least 1 JPW Coin to submit an order.`);
                     return;
                 }
 
-                user.reaches -= 1;
+                user.jpwCoins -= 1;
                 await user.save();
 
                 const newOrder = await OrderModel.create({ telegramChatId: chatId, targetId, targetPass });
                 await notifyAdminAndUser(newOrder, user, `🌐 **New Bot Order (Pending)**\n💬 Chat ID: \`${chatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
 
-                bot.sendMessage(chatId, `📦 **Order Successfully Submitted!** 🚀\n\n🎯 Target ID: \`${targetId}\`\n📌 Status: *Pending ⏳*\n💎 Remaining Balance: *${user.reaches.toFixed(4)} Reaches*`);
+                bot.sendMessage(chatId, `📦 **Order Successfully Submitted!** 🚀\n\n🎯 Target ID: \`${targetId}\`\n📌 Status: *Pending ⏳*\n🪙 Remaining Coins: *${user.jpwCoins.toFixed(2)} Coins*`);
                 return;
             }
         });
@@ -544,13 +547,22 @@ function startCustomerBot(token, isPrimary) {
                 const portalUrl = serverPublicUrl || "https://cashtree.space";
                 const referralLink = `https://t.me/${botUsername}?start=ref_${chatId}`;
                 bot.answerCallbackQuery(query.id, { text: 'Refer & Earn info' });
-                bot.sendMessage(chatId, `👥 **Refer & Earn System (100 to 0.0001 Reach):**\n\nYour Link:\n\`${referralLink}\`\n\n📌 **Rule:** Win anywhere from 100 to 0.0001 Reach! When your friend joins through this link and completes a **minimum ₹100** first recharge, you will get a random bonus from **0.0001 to 1 Reach** (2% chance to win 1 full Reach)!`, { parse_mode: 'Markdown' });
+                bot.sendMessage(chatId, `👥 **Refer & Earn System:**\n\nYour Link:\n\`${referralLink}\`\n\n📌 **Rule:** When your friend joins and completes a minimum ₹100 recharge, you will get a random JPW Coins bonus!`, { parse_mode: 'Markdown' });
             } else if (data === 'start_reach_transfer') {
                 transferSessions[chatId] = { step: 'awaiting_receiver' };
-                bot.answerCallbackQuery(query.id, { text: 'Starting reach transfer...' });
-                bot.sendMessage(chatId, `🤝 **Share Reach:**\nWho do you want to send reaches to? Enter their **Telegram Chat ID**:`, { parse_mode: 'Markdown' });
-            } else if (data === 'watch_ad_task') {
-                bot.answerCallbackQuery(query.id, { text: '⏳ This feature is coming soon!', show_alert: true });
+                bot.answerCallbackQuery(query.id, { text: 'Starting coin transfer...' });
+                bot.sendMessage(chatId, `🤝 **Share JPW Coins:**\nEnter recipient's **Telegram Chat ID**:`, { parse_mode: 'Markdown' });
+            } else if (data === 'convert_coins') {
+                if (!user || user.jpwCoins < 1) {
+                    bot.answerCallbackQuery(query.id, { text: '❌ You need at least 1 JPW Coin to convert!', show_alert: true });
+                    return;
+                }
+                const convertAmount = Math.floor(user.jpwCoins);
+                user.jpwCoins -= convertAmount;
+                user.reaches += convertAmount;
+                await user.save();
+                bot.answerCallbackQuery(query.id, { text: `✅ Converted ${convertAmount} Coins to Reaches!`, show_alert: true });
+                bot.sendMessage(chatId, `🔄 **Conversion Successful!**\nConverted \`${convertAmount} JPW Coins\` into \`${convertAmount} Reaches\` 💎\n\n🪙 Coins: *${user.jpwCoins.toFixed(2)}*\n💎 Reaches: *${user.reaches.toFixed(4)}*`, { parse_mode: 'Markdown' });
             } else if (data === 'claim_daily_bonus') {
                 const now = new Date();
                 if (user && user.lastBonusTime) {
@@ -562,27 +574,28 @@ function startCustomerBot(token, isPrimary) {
                     }
                 }
                 if (user) {
-                    const randomBonus = parseFloat((Math.random() * (0.001 - 0.0001) + 0.0001).toFixed(6));
-                    user.reaches += randomBonus;
+                    const randomBonus = parseFloat((Math.random() * (0.1 - 0.01) + 0.01).toFixed(2));
+                    user.jpwCoins += randomBonus;
                     user.lastBonusTime = now;
                     await user.save();
-                    bot.answerCallbackQuery(query.id, { text: `🎉 +${randomBonus} Daily Bonus Claimed!`, show_alert: true });
-                    bot.sendMessage(chatId, `🎁 **Daily Bonus Claimed!**\n\`+${randomBonus} Reaches\` added to your account. New Balance: *${user.reaches.toFixed(4)} Reaches* 💎`, { parse_mode: 'Markdown' });
+                    bot.answerCallbackQuery(query.id, { text: `🎉 +${randomBonus} JPW Coins Claimed!`, show_alert: true });
+                    bot.sendMessage(chatId, `🎁 **Daily Bonus Claimed!**\n\`+${randomBonus} JPW Coins\` added. Balance: *${user.jpwCoins.toFixed(2)} Coins* 🪙`, { parse_mode: 'Markdown' });
                 }
             } else if (data === 'check_balance') {
-                const bal = user ? user.reaches : 0;
-                bot.answerCallbackQuery(query.id, { text: `Your Balance: ${bal.toFixed(4)} Reaches` });
-                bot.sendMessage(chatId, `💎 **Your Current Balance:** *${bal.toFixed(4)} Reaches* ✨`, { parse_mode: 'Markdown' });
+                const coins = user ? user.jpwCoins : 0;
+                const reaches = user ? user.reaches : 0;
+                bot.answerCallbackQuery(query.id, { text: `Coins: ${coins.toFixed(2)} | Reaches: ${reaches.toFixed(4)}` });
+                bot.sendMessage(chatId, `🪙 **Your Balance:**\n\nJPW Coins: *${coins.toFixed(2)} Coins*\nReaches: *${reaches.toFixed(4)} Reaches* ✨`, { parse_mode: 'Markdown' });
             } else if (data === 'view_packages') {
                 let inlineRows = [];
                 RECHARGE_PACKAGES.forEach(p => {
-                    inlineRows.push([{ text: `💳 Buy ₹${p.amount} ➡️ ${p.reaches} Reaches`, callback_data: `buy_${p.amount}_${p.reaches}` }]);
+                    inlineRows.push([{ text: `💳 Buy ₹${p.amount} ➡️ ${p.coins} JPW Coins`, callback_data: `buy_${p.amount}_${p.coins}` }]);
                 });
-                bot.sendMessage(chatId, `📦 **Select Recharge Package:** 🔥`, {
+                bot.sendMessage(chatId, `📦 **Select JPW Coin Package:** 🔥`, {
                     reply_markup: { inline_keyboard: inlineRows }
                 });
             } else if (data.startsWith('buy_')) {
-                const [, amount, reaches] = data.split('_');
+                const [, amount, coins] = data.split('_');
                 bot.answerCallbackQuery(query.id, { text: 'Generating payment link...' });
                 
                 try {
@@ -595,7 +608,7 @@ function startCustomerBot(token, isPrimary) {
                         order_amount: parseFloat(amount),
                         order_currency: "INR",
                         customer_details: { customer_id: String(chatId), customer_phone: "9999999999", customer_email: "test@jpw.com" },
-                        order_meta: { return_url: `${serverUrl}/?payment=success&telegramChatId=${chatId}&reaches=${reaches}&order_id=${orderId}` }
+                        order_meta: { return_url: `${serverUrl}/?payment=success&telegramChatId=${chatId}&coins=${coins}&order_id=${orderId}` }
                     });
 
                     const options = {
@@ -618,7 +631,7 @@ function startCustomerBot(token, isPrimary) {
                                 const json = JSON.parse(body);
                                 if (response.statusCode === 200 && json.payment_session_id) {
                                     const portalUrl = serverPublicUrl || "https://cashtree.space";
-                                    await bot.sendMessage(chatId, `💳 **Click below to complete your payment via Cashfree:**\n\n[👉 Pay ₹${amount} (For ${reaches} Reaches)](${portalUrl})`, { parse_mode: 'Markdown' });
+                                    await bot.sendMessage(chatId, `💳 **Click below to complete your payment via Cashfree:**\n\n[👉 Pay ₹${amount} (For ${coins} JPW Coins)](${portalUrl})`, { parse_mode: 'Markdown' });
                                 } else {
                                     await bot.sendMessage(chatId, `❌ Payment initialization failed: ${json.message || 'Error'}`);
                                 }
@@ -754,7 +767,7 @@ app.post('/api/mini-app/auth', async (req, res) => {
 
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
         if (!user) {
-            user = await UserModel.create({ telegramChatId: String(telegramChatId), name: name || 'User', reaches: 0 });
+            user = await UserModel.create({ telegramChatId: String(telegramChatId), name: name || 'User', jpwCoins: 0, reaches: 0 });
             await notifyAdminDirect(`👤 **New Mini App User**\n💬 Chat ID: \`${telegramChatId}\`\n📌 Name: ${name}`);
         }
 
@@ -822,11 +835,11 @@ app.post('/api/claim-daily-bonus', async (req, res) => {
             }
         }
 
-        const randomBonus = parseFloat((Math.random() * (0.001 - 0.0001) + 0.0001).toFixed(6));
-        user.reaches += randomBonus;
+        const randomBonus = parseFloat((Math.random() * (0.1 - 0.01) + 0.01).toFixed(2));
+        user.jpwCoins += randomBonus;
         user.lastBonusTime = now;
         await user.save();
-        res.json({ success: true, message: `Daily bonus claimed: +${randomBonus}`, user, randomBonus });
+        res.json({ success: true, message: `Daily bonus claimed: +${randomBonus} Coins`, user, randomBonus });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -841,7 +854,7 @@ app.post('/api/claim-ad-reward', async (req, res) => {
     }
 });
 
-app.post('/api/transfer-reach', async (req, res) => {
+app.post('/api/transfer-coins', async (req, res) => {
     try {
         const { senderChatId, receiverChatId, amount } = req.body;
         const sendAmount = parseFloat(amount);
@@ -851,21 +864,21 @@ app.post('/api/transfer-reach', async (req, res) => {
         }
 
         if (senderChatId === receiverChatId) {
-            return res.json({ success: false, message: 'You cannot transfer reach to yourself!' });
+            return res.json({ success: false, message: 'You cannot transfer coins to yourself!' });
         }
 
         let sender = await UserModel.findOne({ telegramChatId: String(senderChatId) });
-        if (!sender || sender.reaches < sendAmount) {
-            return res.json({ success: false, message: 'Insufficient balance!' });
+        if (!sender || sender.jpwCoins < sendAmount) {
+            return res.json({ success: false, message: 'Insufficient JPW Coins balance!' });
         }
 
         let receiver = await UserModel.findOne({ telegramChatId: String(receiverChatId) });
         if (!receiver) {
-            return res.json({ success: false, message: 'Receiver chat ID is not registered in the system!' });
+            return res.json({ success: false, message: 'Receiver chat ID is not registered!' });
         }
 
-        sender.reaches -= sendAmount;
-        receiver.reaches += sendAmount;
+        sender.jpwCoins -= sendAmount;
+        receiver.jpwCoins += sendAmount;
 
         await sender.save();
         await receiver.save();
@@ -873,11 +886,31 @@ app.post('/api/transfer-reach', async (req, res) => {
         try {
             if (CUSTOMER_BOT_TOKENS[0]) {
                 const tempBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
-                await tempBot.sendMessage(receiverChatId, `🎁 **Reach Received Alert!** 🎉\n\nYou received \`+${sendAmount} Reaches\` from ${sender.name || 'a user'}!\nNew Balance: *${receiver.reaches.toFixed(4)} Reaches* 💎\n\n*(JPW REACHED SERVICES BOT)*`, { parse_mode: 'Markdown' });
+                await tempBot.sendMessage(receiverChatId, `🎁 **Coins Received Alert!** 🎉\n\nYou received \`+${sendAmount} JPW Coins\` from ${sender.name || 'a user'}!\nNew Balance: *${receiver.jpwCoins.toFixed(2)} Coins* 🪙`, { parse_mode: 'Markdown' });
             }
         } catch(e) {}
 
-        res.json({ success: true, message: `Successfully transferred ${sendAmount} reaches!`, sender });
+        res.json({ success: true, message: `Successfully transferred ${sendAmount} JPW Coins!`, sender });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/convert-coins', async (req, res) => {
+    try {
+        const { telegramChatId, amount } = req.body;
+        const convertAmt = parseInt(amount);
+        let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
+
+        if (!user || isNaN(convertAmt) || convertAmt <= 0 || user.jpwCoins < convertAmt) {
+            return res.json({ success: false, message: 'Invalid amount or insufficient coins!' });
+        }
+
+        user.jpwCoins -= convertAmt;
+        user.reaches += convertAmt;
+        await user.save();
+
+        res.json({ success: true, message: `Successfully converted ${convertAmt} Coins to Reaches!`, user });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -898,16 +931,16 @@ app.post('/api/admin/giveaway', async (req, res) => {
 
         const splitAmount = amount / allUsers.length;
         for (let u of allUsers) {
-            u.reaches += splitAmount;
+            u.jpwCoins += splitAmount;
             await u.save();
             try {
                 if (CUSTOMER_BOT_TOKENS[0]) {
                     const tempBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
-                    await tempBot.sendMessage(u.telegramChatId, `🎁 **Free Giveaway Split Alert!** 🎉\n\nAdmin has split a total of \`${amount} Reaches\` among all users.\nYou received: \`+${splitAmount.toFixed(6)} Reaches\`! 💎\n\n*(JPW REACHED SERVICES BOT)*`, { parse_mode: 'Markdown' });
+                    await tempBot.sendMessage(u.telegramChatId, `🎁 **Free Giveaway Split Alert!** 🎉\n\nAdmin has split a total of \`${amount} JPW Coins\` among all users.\nYou received: \`+${splitAmount.toFixed(4)} Coins\`! 🪙\n\n*(JPW REACHED SERVICES BOT)*`, { parse_mode: 'Markdown' });
                 }
             } catch(e) {}
         }
-        res.json({ success: true, message: `Successfully split ${amount} reaches among ${allUsers.length} users!` });
+        res.json({ success: true, message: `Successfully split ${amount} JPW Coins among ${allUsers.length} users!` });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -957,7 +990,7 @@ app.get('/api/packages', (req, res) => {
 // --- CASHFREE PAYMENT API ---
 app.post('/api/pay', async (req, res) => {
     try {
-        const { telegramChatId, amount, reaches } = req.body;
+        const { telegramChatId, amount, coins } = req.body;
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;
         const serverUrl = "https://cashtree.space";
         let orderId = `JPW_${Date.now()}_${telegramChatId}`;
@@ -966,7 +999,7 @@ app.post('/api/pay', async (req, res) => {
 
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
         if (user) {
-            user.activePackage = `₹${amount} (${reaches} Reaches)`;
+            user.activePackage = `₹${amount} (${coins} JPW Coins)`;
             
             if (amount >= 100 && user.referredBy && !user.hasRecharged100) {
                 user.hasRecharged100 = true;
@@ -975,21 +1008,15 @@ app.post('/api/pay', async (req, res) => {
                 if (referrer && !user.referralRewarded) {
                     user.referralRewarded = true;
                     
-                    let refBonus = 0.0001;
-                    const roll = Math.random();
-                    if (roll <= 0.02) {
-                        refBonus = 1.0;
-                    } else {
-                        refBonus = parseFloat((Math.random() * (1.0 - 0.0001) + 0.0001).toFixed(6));
-                    }
+                    let refBonus = parseFloat((Math.random() * (5.0 - 0.5) + 0.5).toFixed(2));
 
-                    referrer.reaches += refBonus;
+                    referrer.jpwCoins += refBonus;
                     await referrer.save();
 
                     try {
                         if (CUSTOMER_BOT_TOKENS[0]) {
                             const tempBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
-                            await tempBot.sendMessage(referrer.telegramChatId, `👥 **Referral Bonus Received (Marketing Bonus)!** 🎉\n\nYour referred user has completed a ₹100+ recharge!\nYou received: \`+${refBonus.toFixed(4)} Reaches\`! 💎\n\n*(JPW REACHED SERVICES BOT)*`, { parse_mode: 'Markdown' });
+                            await tempBot.sendMessage(referrer.telegramChatId, `👥 **Referral Bonus Received!** 🎉\n\nYour referred user has completed a ₹100+ recharge!\nYou received: \`+${refBonus} JPW Coins\`! 🪙\n\n*(JPW REACHED SERVICES BOT)*`, { parse_mode: 'Markdown' });
                         }
                     } catch(e) {}
                 }
@@ -1008,7 +1035,7 @@ app.post('/api/pay', async (req, res) => {
                 customer_email: "test@jpw.com"
             },
             order_meta: {
-                return_url: `${serverUrl}/?payment=success&telegramChatId=${telegramChatId}&reaches=${reaches}&order_id=${orderId}`
+                return_url: `${serverUrl}/?payment=success&telegramChatId=${telegramChatId}&coins=${coins}&order_id=${orderId}`
             }
         });
 
@@ -1053,7 +1080,7 @@ app.post('/api/pay', async (req, res) => {
 
 app.post('/api/verify-instant', async (req, res) => {
     try {
-        const { telegramChatId, reaches, order_id } = req.body;
+        const { telegramChatId, coins, order_id } = req.body;
         const transactionId = order_id || `INSTANT_${Date.now()}_${telegramChatId}`;
         const existingUtr = await UsedUtrModel.findOne({ utrId: transactionId });
         if (existingUtr) return res.json({ success: false, message: 'Already credited!' });
@@ -1061,9 +1088,9 @@ app.post('/api/verify-instant', async (req, res) => {
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
         if (user) {
             await UsedUtrModel.create({ utrId: transactionId });
-            user.reaches += parseFloat(reaches);
+            user.jpwCoins += parseFloat(coins);
             await user.save();
-            await notifyCustomerOnly(null, user, `💳 **Payment Successful!** 🎉✨\n\n✨ Added: \`+${reaches} Reaches\` 🚀\n💰 **New Total Balance:** \`${user.reaches.toFixed(4)} Reaches\` 💎\n\n*(JPW REACHED SERVICES BOT)*`);
+            await notifyCustomerOnly(null, user, `💳 **Payment Successful!** 🎉✨\n\n✨ Added: \`+${coins} JPW Coins\` 🪙\n💰 **New Coins Balance:** \`${user.jpwCoins.toFixed(2)} Coins\` 🪙\n\n*(JPW REACHED SERVICES BOT)*`);
             res.json({ success: true, user });
         } else { 
             res.json({ success: false, message: 'User not found' }); 
@@ -1078,19 +1105,19 @@ app.post('/api/order', async (req, res) => {
         const { telegramChatId, targetId, targetPass } = req.body;
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
 
-        if (!user || user.reaches < 1) {
-            return res.json({ success: false, message: 'Insufficient balance! At least 1 Reach is required.' });
+        if (!user || user.jpwCoins < 1) {
+            return res.json({ success: false, message: 'Insufficient JPW Coins! At least 1 Coin is required.' });
         }
 
-        user.reaches -= 1;
+        user.jpwCoins -= 1;
         await user.save();
 
         const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId, targetPass });
         await notifyAdminAndUser(newOrder, user, `🌐 **New Website Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
 
-        await notifyCustomerOnly(newOrder, user, `📦 **Order Successfully Placed!** 🚀✨\n\n🎯 **Target ID:** \`${targetId}\`\n📌 **Status:** *Pending ⏳*\n\n💎 Remaining Balance: *${user.reaches.toFixed(4)} Reaches*`);
+        await notifyCustomerOnly(newOrder, user, `📦 **Order Successfully Placed!** 🚀✨\n\n🎯 **Target ID:** \`${targetId}\`\n📌 **Status:** *Pending ⏳*\n\n🪙 Remaining Coins: *${user.jpwCoins.toFixed(2)} Coins*`);
 
-        res.json({ success: true, message: 'Order successfully submitted!', remainingReaches: user.reaches });
+        res.json({ success: true, message: 'Order successfully submitted!', remainingCoins: user.jpwCoins });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -1119,12 +1146,12 @@ app.post('/api/admin/update-reaches', async (req, res) => {
 
         const amount = parseFloat(count) || 0;
         if (action === 'add') {
-            user.reaches += amount;
+            user.jpwCoins += amount;
         } else if (action === 'deduct') {
-            user.reaches = Math.max(0, user.reaches - amount);
+            user.jpwCoins = Math.max(0, user.jpwCoins - amount);
         }
         await user.save();
-        res.json({ success: true, message: `Reaches updated! New Balance: ${user.reaches.toFixed(4)}` });
+        res.json({ success: true, message: `Coins updated! New Balance: ${user.jpwCoins.toFixed(2)}` });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -1144,8 +1171,8 @@ app.post('/api/admin/order-action', async (req, res) => {
             statusMsg = 'Accepted ✅';
         } else if (action === 'reject') {
             order.status = 'Rejected';
-            statusMsg = 'Rejected ❌ (Reach Refunded)';
-            if (user) { user.reaches += 1; await user.save(); }
+            statusMsg = 'Rejected ❌ (1 Coin Refunded)';
+            if (user) { user.jpwCoins += 1; await user.save(); }
         } else if (action === 'inprogress') {
             order.status = 'In Progress';
             statusMsg = 'In Progress ⏳';
@@ -1154,8 +1181,8 @@ app.post('/api/admin/order-action', async (req, res) => {
             statusMsg = 'Completed 🎉';
         } else if (action === 'cancel' && !order.status.includes('Refunded')) {
             order.status = 'Cancelled & Refunded';
-            statusMsg = 'Cancelled ❌ (Reach Refunded)';
-            if (user) { user.reaches += 1; await user.save(); }
+            statusMsg = 'Cancelled ❌ (1 Coin Refunded)';
+            if (user) { user.jpwCoins += 1; await user.save(); }
         }
 
         await order.save();
