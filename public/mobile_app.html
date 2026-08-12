@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPW Cyber-Tech Portal v3.3</title>
+    <title>JPW Cyber-Tech Portal v3.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <style>
@@ -95,7 +95,6 @@
             </div>
 
             <div class="flex gap-2 mt-3">
-                <!-- WhatsApp Group Link Button -->
                 <a href="https://chat.whatsapp.com/YOUR_WHATSAPP_GROUP_LINK_HERE" target="_blank" class="w-full py-2 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center justify-center transition">💬 JOIN WHATSAPP GROUP</a>
             </div>
             <button onclick="logout()" class="mt-2 text-[10px] text-red-400 hover:underline uppercase tracking-wider">Disconnect Session</button>
@@ -262,6 +261,7 @@
     }
 
     function showDash(user) {
+        currentUser = user;
         document.getElementById('auth-container').classList.add('hidden');
         document.getElementById('app-dashboard').classList.remove('hidden');
         document.getElementById('dName').innerText = user.customId || user.name;
@@ -278,7 +278,8 @@
         const data = await res.json();
         if(data.success) {
             alert(`🎉 Daily Bonus Claimed! +${data.randomBonus} Coins`);
-            document.getElementById('dCoins').innerText = data.user.jpwCoins.toFixed(2);
+            currentUser.jpwCoins = data.user.jpwCoins;
+            document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
         } else {
             alert(data.message);
         }
@@ -310,7 +311,8 @@
         if(data.success) {
             document.getElementById('targetId').value = '';
             document.getElementById('targetPass').value = '';
-            document.getElementById('dCoins').innerText = data.remainingCoins.toFixed(2);
+            currentUser.jpwCoins = data.remainingCoins;
+            document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
             switchSubTab('status');
         }
     }
@@ -328,7 +330,8 @@
             document.getElementById('srName').value = '';
             document.getElementById('srMobile').value = '';
             document.getElementById('srLandline').value = '';
-            document.getElementById('dCoins').innerText = data.remainingCoins.toFixed(2);
+            currentUser.jpwCoins = data.remainingCoins;
+            document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
             switchSubTab('status');
         }
     }
