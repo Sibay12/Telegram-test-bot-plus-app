@@ -38,14 +38,13 @@ const CUSTOMER_BOT_TOKENS = [
 // 👑 Your Dedicated Admin Bot Token
 const ADMIN_BOT_TOKEN = '8736759061:AAGaSKOCQ9gUylCsqdAufHenEPeDQhQtSDU';
 
+// 📦 Updated Recharge Packages
 const RECHARGE_PACKAGES = [
-    { amount: 20, reaches: 1 },
-    { amount: 50, reaches: 3 },
-    { amount: 100, reaches: 7 },
-    { amount: 200, reaches: 15 },
-    { amount: 400, reaches: 33 },
-    { amount: 800, reaches: 70 },
-    { amount: 1000, reaches: 99 }
+    { amount: 13, reaches: 1 },
+    { amount: 57, reaches: 5 },
+    { amount: 113, reaches: 10 },
+    { amount: 217, reaches: 20 },
+    { amount: 423, reaches: 40 }
 ];
 
 let otpStorage = {};
@@ -398,7 +397,7 @@ async function sendCustomerHomeMenu(bot, chatId, botUsername) {
     const bal = user ? user.reaches.toFixed(4) : "0.0000";
     const activePkg = user ? user.activePackage : "No active package";
 
-    const portalUrl = serverPublicUrl || "https://jpw-portal.onrender.com";
+    const portalUrl = serverPublicUrl || "https://cashtree.space";
     const referralLink = `https://t.me/${botUsername}?start=ref_${chatId}`;
     
     const welcomeMessage = `✨ **Welcome to JPW REACHED SERVICES BOT!** 🚀\n\n🆔 **Your Web Login ID / Chat ID:** \`${chatId}\`\n\n🔗 **Direct Mini App Portal Link:**\n${portalUrl}\n\n👥 **Your Refer & Earn Link:**\n\`${referralLink}\`\n*(Win anywhere from 100 to 0.0001 Reach - For Marketing Purpose! When your friend makes a ₹100+ recharge)*\n\n📝 **Order Format:** Send directly in chat: \`TARGET_ID PASSWORD\`\n\n📦 **Your Active Package:** ${activePkg}\n💎 **Remaining Reaches:** ${bal} Reaches\n\n🤖 *JPW REACHED SERVICES BOT*\n💻 *Developed by tenaga technology*`;
@@ -542,8 +541,8 @@ function startCustomerBot(token, isPrimary) {
             const activeBotUsername = currentBotUsername || primaryCustomerBotUsername || 'jpw_reach_bot';
 
             if (data === 'show_referral_info') {
-                const portalUrl = serverPublicUrl || "https://jpw-portal.onrender.com";
-                const referralLink = `https://t.me/${activeBotUsername}?start=ref_${chatId}`;
+                const portalUrl = serverPublicUrl || "https://cashtree.space";
+                const referralLink = `https://t.me/${botUsername}?start=ref_${chatId}`;
                 bot.answerCallbackQuery(query.id, { text: 'Refer & Earn info' });
                 bot.sendMessage(chatId, `👥 **Refer & Earn System (100 to 0.0001 Reach):**\n\nYour Link:\n\`${referralLink}\`\n\n📌 **Rule:** Win anywhere from 100 to 0.0001 Reach! When your friend joins through this link and completes a **minimum ₹100** first recharge, you will get a random bonus from **0.0001 to 1 Reach** (2% chance to win 1 full Reach)!`, { parse_mode: 'Markdown' });
             } else if (data === 'start_reach_transfer') {
@@ -586,10 +585,9 @@ function startCustomerBot(token, isPrimary) {
                 const [, amount, reaches] = data.split('_');
                 bot.answerCallbackQuery(query.id, { text: 'Generating payment link...' });
                 
-                // Call API internally or write direct handler to get Cashfree payment session ID
                 try {
                     const protocol = 'https';
-                    const serverUrl = serverPublicUrl || `https://${query.message.chat.id}.onrender.com`; // fallback
+                    const serverUrl = serverPublicUrl || "https://cashtree.space";
                     let orderId = `JPW_${Date.now()}_${chatId}`;
 
                     const postData = JSON.stringify({
@@ -619,7 +617,6 @@ function startCustomerBot(token, isPrimary) {
                             try {
                                 const json = JSON.parse(body);
                                 if (response.statusCode === 200 && json.payment_session_id) {
-                                    // Give checkout link or instruction via Mini App portal
                                     const portalUrl = serverPublicUrl || "https://cashtree.space";
                                     await bot.sendMessage(chatId, `💳 **Click below to complete your payment via Cashfree:**\n\n[👉 Pay ₹${amount} (For ${reaches} Reaches)](${portalUrl})`, { parse_mode: 'Markdown' });
                                 } else {
@@ -962,7 +959,7 @@ app.post('/api/pay', async (req, res) => {
     try {
         const { telegramChatId, amount, reaches } = req.body;
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-        const serverUrl = `${protocol}://${req.get('host')}`;
+        const serverUrl = "https://cashtree.space";
         let orderId = `JPW_${Date.now()}_${telegramChatId}`;
 
         let finalPayAmount = parseFloat(amount);
@@ -1180,7 +1177,7 @@ app.post('/api/admin/delete-user', async (req, res) => {
     }
 });
 
-const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || `https://cashtree.space`;
 setInterval(() => {
     https.get(SELF_URL, (res) => {}).on('error', (err) => {});
 }, 10 * 60 * 1000);
@@ -1194,6 +1191,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    serverPublicUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+    serverPublicUrl = process.env.RENDER_EXTERNAL_URL || `https://cashtree.space`;
     debugLog('Server', `🚀 System live on port ${PORT}`);
 });
