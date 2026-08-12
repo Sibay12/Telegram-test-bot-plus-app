@@ -38,13 +38,13 @@ const CUSTOMER_BOT_TOKENS = [
 // 👑 Your Dedicated Admin Bot Token
 const ADMIN_BOT_TOKEN = '8736759061:AAGaSKOCQ9gUylCsqdAufHenEPeDQhQtSDU';
 
-// 📦 Updated Recharge Packages
+// 📦 Updated Recharge Packages with Tax & Settlement Buffer
 const RECHARGE_PACKAGES = [
-    { amount: 13, reaches: 1 },
-    { amount: 57, reaches: 5 },
-    { amount: 113, reaches: 10 },
-    { amount: 217, reaches: 20 },
-    { amount: 423, reaches: 40 }
+    { amount: 15, reaches: 1 },
+    { amount: 65, reaches: 5 },
+    { amount: 125, reaches: 10 },
+    { amount: 235, reaches: 20 },
+    { amount: 425, reaches: 40 }
 ];
 
 let otpStorage = {};
