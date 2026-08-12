@@ -3,82 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPW Engineer Mobile Portal</title>
+    <title>JPW Cyber-Tech Portal v3.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #050b14; color: #f8fafc; font-family: sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border: 1px solid #334155; }
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
+        body { 
+            background: #020617; 
+            color: #38bdf8; 
+            font-family: 'JetBrains Mono', monospace; 
+            background-image: radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%);
+        }
+        .tech-glass { 
+            background: rgba(15, 23, 42, 0.90); 
+            backdrop-filter: blur(16px); 
+            border: 1px solid rgba(56, 189, 248, 0.2); 
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.1);
+        }
+        .tech-glow { box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
+        .tech-glow-emerald { box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+        input:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.4); }
     </style>
 </head>
 <body class="p-4 flex items-center justify-center min-h-screen">
 
-<div class="w-full max-w-md glass p-6 rounded-3xl shadow-2xl">
-    <div class="text-center mb-6">
-        <h2 class="text-2xl font-black text-sky-400 tracking-wider">JPW PORTAL</h2>
-        <p class="text-xs text-slate-400 mt-1">Engineer Mobile & Services Dashboard</p>
+<div class="w-full max-w-md tech-glass p-6 rounded-3xl relative overflow-hidden">
+    <!-- Top Tech Accent Bar -->
+    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500"></div>
+
+    <div class="text-center mb-5">
+        <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-300 tracking-wider">JPW // PORTAL</h2>
+        <p class="text-[10px] text-slate-400 mt-1 uppercase tracking-widest">[ Secure Engineer Node ]</p>
     </div>
 
     <!-- Auth Container (Login / Register) -->
     <div id="auth-container">
-        <div class="flex gap-2 mb-4 bg-slate-900 p-1 rounded-2xl border border-slate-800">
-            <button onclick="switchTab('login')" id="tabL" class="flex-1 py-2.5 rounded-xl font-bold text-sm bg-sky-500 text-white transition">Login</button>
-            <button onclick="switchTab('register')" id="tabR" class="flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 transition">Register</button>
+        <div class="flex gap-2 mb-4 bg-slate-950 p-1 rounded-2xl border border-slate-800">
+            <button onclick="switchTab('login')" id="tabL" class="flex-1 py-2.5 rounded-xl font-bold text-xs bg-sky-500 text-slate-950 transition tech-glow">LOGIN</button>
+            <button onclick="switchTab('register')" id="tabR" class="flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-400 transition">REGISTER</button>
         </div>
         
         <!-- Login Form -->
         <div id="loginForm">
-            <input type="text" id="logId" placeholder="10-Digit Custom ID" class="w-full p-3.5 mb-3 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-sky-500">
-            <input type="password" id="logPass" placeholder="Password" class="w-full p-3.5 mb-4 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-sky-500">
-            <button onclick="appLogin()" class="w-full py-3.5 bg-sky-600 hover:bg-sky-500 font-bold rounded-xl shadow-lg shadow-sky-600/30 transition">Login to Portal</button>
+            <div class="mb-3">
+                <label class="block text-[10px] text-cyan-400 mb-1 uppercase tracking-wider">Custom ID (10-Digit)</label>
+                <input type="text" id="logId" placeholder="ENTER ID" class="w-full p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-cyan-300">
+            </div>
+            <div class="mb-4">
+                <label class="block text-[10px] text-cyan-400 mb-1 uppercase tracking-wider">Access Password</label>
+                <input type="password" id="logPass" placeholder="••••••••" class="w-full p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-cyan-300">
+            </div>
+            <button onclick="appLogin()" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-sky-600 hover:from-cyan-400 hover:to-sky-500 text-slate-950 font-extrabold rounded-xl tech-glow transition text-xs tracking-wider">INITIALIZE LOGIN</button>
         </div>
 
         <!-- Register Form -->
         <div id="regForm" class="hidden">
-            <input type="text" id="regName" placeholder="Your Full Name" class="w-full p-3 mb-3 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-emerald-500">
-            <input type="text" id="regId" placeholder="Choose 10-Digit ID" class="w-full p-3 mb-3 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-emerald-500">
-            <input type="password" id="regPass" placeholder="Create Password" class="w-full p-3 mb-4 rounded-xl bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-emerald-500">
-            <button onclick="appRegister()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl shadow-lg shadow-emerald-600/30 transition">Create Account</button>
+            <div class="mb-3">
+                <label class="block text-[10px] text-emerald-400 mb-1 uppercase tracking-wider">Engineer Name</label>
+                <input type="text" id="regName" placeholder="FULL NAME" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-emerald-300">
+            </div>
+            <div class="mb-3">
+                <label class="block text-[10px] text-emerald-400 mb-1 uppercase tracking-wider">Choose 10-Digit ID</label>
+                <input type="text" id="regId" placeholder="UNIQUE ID" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-emerald-300">
+            </div>
+            <div class="mb-4">
+                <label class="block text-[10px] text-emerald-400 mb-1 uppercase tracking-wider">Security Password</label>
+                <input type="password" id="regPass" placeholder="••••••••" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-emerald-300">
+            </div>
+            <button onclick="appRegister()" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-extrabold rounded-xl tech-glow-emerald transition text-xs tracking-wider">REGISTER NODE</button>
         </div>
     </div>
 
     <!-- Dashboard (After Login) -->
     <div id="app-dashboard" class="hidden">
-        <div class="mb-4 p-4 bg-slate-900 rounded-2xl border border-slate-800 text-center">
-            <p class="text-xs text-slate-400">Welcome back,</p>
-            <p id="dName" class="text-lg font-black text-sky-400 mt-0.5"></p>
-            <p class="text-xs font-bold text-amber-400 mt-1">🪙 Coins: <span id="dCoins">0</span></p>
+        <!-- User Info & Balance Box -->
+        <div class="mb-4 p-4 bg-slate-950/80 rounded-2xl border border-sky-500/30 text-center relative">
+            <div class="absolute top-2 right-3 flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-[9px] text-emerald-400">ONLINE</span>
+            </div>
+            <p class="text-[10px] text-slate-400">NODE USER</p>
+            <p id="dName" class="text-sm font-black text-cyan-300 mt-0.5"></p>
+            <p class="text-xs font-bold text-amber-400 mt-1 bg-amber-500/10 py-1 px-3 rounded-full inline-block border border-amber-500/20">🪙 COINS: <span id="dCoins">0.00</span></p>
             
-            <!-- Quick Action Buttons -->
-            <div class="grid grid-cols-2 gap-2 mt-4">
-                <button onclick="claimBonus()" class="py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition shadow-md">🎁 Daily Bonus</button>
-                <button onclick="openPackages()" class="py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-bold transition shadow-md">📦 Buy Coins</button>
-                <button onclick="openServiceModal('reach')" class="py-2.5 bg-sky-600 hover:bg-sky-500 rounded-xl text-xs font-bold transition shadow-md">⚡ Reach Order</button>
-                <button onclick="openServiceModal('sr')" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold transition shadow-md">📌 SR Service</button>
+            <!-- Navigation Action Tabs -->
+            <div class="grid grid-cols-4 gap-1.5 mt-3">
+                <button onclick="switchSubTab('services')" id="btnS" class="py-2 bg-sky-500 text-slate-950 rounded-lg text-[10px] font-bold transition">SERVICES</button>
+                <button onclick="switchSubTab('packages')" id="btnP" class="py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition">PACKAGES</button>
+                <button onclick="switchSubTab('bonus')" id="btnB" class="py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition">BONUS</button>
+                <button onclick="switchSubTab('status')" id="btnT" class="py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition">STATUS</button>
             </div>
 
-            <div class="flex gap-2 mt-2">
-                <button onclick="fetchStatus()" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition border border-slate-700">🔄 Refresh Status</button>
-                <a href="tel:8167443804" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-xl text-xs font-bold flex items-center justify-center transition">📞 Call Support</a>
+            <div class="flex gap-2 mt-3">
+                <a href="tel:8167443804" class="w-full py-2 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center justify-center transition">📞 SUPPORT: 8167443804</a>
             </div>
-            <button onclick="logout()" class="mt-3 text-[11px] text-red-400 hover:underline">Logout from device</button>
+            <button onclick="logout()" class="mt-2 text-[10px] text-red-400 hover:underline uppercase tracking-wider">Disconnect Session</button>
         </div>
 
-        <!-- Service Form Modal / Section -->
-        <div id="serviceFormSection" class="hidden mb-4 p-4 bg-slate-900 rounded-2xl border border-slate-800">
-            <div class="flex justify-between items-center mb-3">
-                <h3 id="formTitle" class="text-xs font-bold text-sky-400 uppercase">Service Form</h3>
-                <button onclick="closeServiceModal()" class="text-xs text-slate-400 hover:text-white">✕ Close</button>
+        <!-- 1. SERVICES TAB (Reach & SR Forms always visible) -->
+        <div id="tabServices" class="space-y-3 mb-2">
+            <div class="p-3.5 bg-slate-950 rounded-2xl border border-sky-500/30">
+                <h3 class="text-xs font-bold text-sky-400 uppercase mb-2">⚡ SUBMIT REACH ORDER (1 Coin)</h3>
+                <input type="text" id="targetId" placeholder="Target ID" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-cyan-300">
+                <input type="password" id="targetPass" placeholder="Target Password" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-cyan-300">
+                <button onclick="submitReachOrder()" class="w-full py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-xs font-bold text-slate-950">EXECUTE REACH ORDER</button>
             </div>
-            <div id="formContent"></div>
+
+            <div class="p-3.5 bg-slate-950 rounded-2xl border border-indigo-500/30">
+                <h3 class="text-xs font-bold text-indigo-400 uppercase mb-2">📌 SUBMIT SR SERVICE (1 Coin)</h3>
+                <input type="text" id="srName" placeholder="Customer Name" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-indigo-300">
+                <input type="text" id="srMobile" placeholder="Mobile Number" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-indigo-300">
+                <input type="text" id="srLandline" placeholder="Landline Number" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-indigo-300">
+                <button onclick="submitSrOrder()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-bold text-slate-950">EXECUTE SR ORDER</button>
+            </div>
         </div>
 
-        <div class="flex justify-between items-center mb-2">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Live Order Status Tracker</h3>
-            <span class="text-[10px] bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20">Real-time</span>
+        <!-- 2. PACKAGES TAB -->
+        <div id="tabPackages" class="hidden space-y-2 mb-2">
+            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
+                <div><span class="font-bold text-purple-400">1 Coin</span><p class="text-[10px] text-slate-400">Price: ₹13</p></div>
+                <button onclick="buyPackage(13, 1)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+            </div>
+            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
+                <div><span class="font-bold text-purple-400">5 Coins</span><p class="text-[10px] text-slate-400">Price: ₹60</p></div>
+                <button onclick="buyPackage(60, 5)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+            </div>
+            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
+                <div><span class="font-bold text-purple-400">10 Coins</span><p class="text-[10px] text-slate-400">Price: ₹115</p></div>
+                <button onclick="buyPackage(115, 10)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+            </div>
+            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
+                <div><span class="font-bold text-purple-400">20 Coins</span><p class="text-[10px] text-slate-400">Price: ₹210</p></div>
+                <button onclick="buyPackage(210, 20)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+            </div>
+            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
+                <div><span class="font-bold text-purple-400">40 Coins</span><p class="text-[10px] text-slate-400">Price: ₹400</p></div>
+                <button onclick="buyPackage(400, 40)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+            </div>
         </div>
-        
-        <div id="statusList" class="space-y-3 max-h-[250px] overflow-y-auto pr-1">
-            <!-- Dynamic Status Cards -->
+
+        <!-- 3. BONUS TAB -->
+        <div id="tabBonus" class="hidden p-4 bg-slate-950 rounded-2xl border border-emerald-500/30 text-center mb-2">
+            <h3 class="text-sm font-bold text-emerald-400 mb-1">🎁 DAILY REWARD BONUS</h3>
+            <p class="text-[11px] text-slate-400 mb-4">Claim free random coins once every 24 hours.</p>
+            <button onclick="claimBonus()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs">CLAIM DAILY BONUS</button>
+        </div>
+
+        <!-- 4. STATUS TRACKER TAB -->
+        <div id="tabStatus" class="hidden mb-2">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LIVE ORDER TRACKER</h3>
+                <button onclick="fetchStatus()" class="text-[10px] text-sky-400 underline">🔄 Refresh</button>
+            </div>
+            <div id="statusList" class="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                <!-- Records load here -->
+            </div>
         </div>
     </div>
 </div>
@@ -98,8 +176,35 @@
     function switchTab(t) {
         document.getElementById('loginForm').classList.toggle('hidden', t !== 'login');
         document.getElementById('regForm').classList.toggle('hidden', t !== 'register');
-        document.getElementById('tabL').className = t === 'login' ? 'flex-1 py-2.5 rounded-xl font-bold text-sm bg-sky-500 text-white transition' : 'flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 transition';
-        document.getElementById('tabR').className = t === 'register' ? 'flex-1 py-2.5 rounded-xl font-bold text-sm bg-emerald-600 text-white transition' : 'flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 transition';
+        document.getElementById('tabL').className = t === 'login' ? 'flex-1 py-2.5 rounded-xl font-bold text-xs bg-sky-500 text-slate-950 transition tech-glow' : 'flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-400 transition';
+        document.getElementById('tabR').className = t === 'register' ? 'flex-1 py-2.5 rounded-xl font-bold text-xs bg-emerald-500 text-slate-950 transition tech-glow-emerald' : 'flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-400 transition';
+    }
+
+    function switchSubTab(sub) {
+        document.getElementById('tabServices').classList.add('hidden');
+        document.getElementById('tabPackages').classList.add('hidden');
+        document.getElementById('tabBonus').classList.add('hidden');
+        document.getElementById('tabStatus').classList.add('hidden');
+
+        document.getElementById('btnS').className = 'py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition';
+        document.getElementById('btnP').className = 'py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition';
+        document.getElementById('btnB').className = 'py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition';
+        document.getElementById('btnT').className = 'py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition';
+
+        if(sub === 'services') {
+            document.getElementById('tabServices').classList.remove('hidden');
+            document.getElementById('btnS').className = 'py-2 bg-sky-500 text-slate-950 rounded-lg text-[10px] font-bold transition';
+        } else if(sub === 'packages') {
+            document.getElementById('tabPackages').classList.remove('hidden');
+            document.getElementById('btnP').className = 'py-2 bg-purple-500 text-slate-950 rounded-lg text-[10px] font-bold transition';
+        } else if(sub === 'bonus') {
+            document.getElementById('tabBonus').classList.remove('hidden');
+            document.getElementById('btnB').className = 'py-2 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-bold transition';
+        } else if(sub === 'status') {
+            document.getElementById('tabStatus').classList.remove('hidden');
+            document.getElementById('btnT').className = 'py-2 bg-indigo-500 text-slate-950 rounded-lg text-[10px] font-bold transition';
+            fetchStatus();
+        }
     }
 
     async function appLogin() {
@@ -137,7 +242,6 @@
         document.getElementById('app-dashboard').classList.remove('hidden');
         document.getElementById('dName').innerText = user.customId || user.name;
         document.getElementById('dCoins').innerText = user.jpwCoins ? user.jpwCoins.toFixed(2) : '0.00';
-        fetchStatus();
     }
 
     function logout() {
@@ -156,36 +260,16 @@
         }
     }
 
-    function openPackages() {
-        alert('To buy packages, please use our Telegram Bot or contact support.');
-    }
-
-    function openServiceModal(type) {
-        const section = document.getElementById('serviceFormSection');
-        const title = document.getElementById('formTitle');
-        const content = document.getElementById('formContent');
-        section.classList.remove('hidden');
-
-        if(type === 'reach') {
-            title.innerText = '⚡ Submit Reach Order (1 Coin)';
-            content.innerHTML = `
-                <input type="text" id="targetId" placeholder="Target ID" class="w-full p-2.5 mb-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                <input type="password" id="targetPass" placeholder="Target Password" class="w-full p-2.5 mb-3 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                <button onclick="submitReachOrder()" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 rounded-lg text-xs font-bold text-white">Submit Reach Order</button>
-            `;
+    async function buyPackage(amount, coins) {
+        const res = await fetch('/api/verify-instant', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId, coins, order_id: `WEB_PAY_${Date.now()}` }) });
+        const data = await res.json();
+        if(data.success) {
+            alert(`✅ Successfully added ${coins} Coins to your account!`);
+            currentUser.jpwCoins = data.user.jpwCoins;
+            document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
         } else {
-            title.innerText = '📌 Submit SR Service (1 Coin)';
-            content.innerHTML = `
-                <input type="text" id="srName" placeholder="Customer Name" class="w-full p-2.5 mb-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                <input type="text" id="srMobile" placeholder="Mobile Number" class="w-full p-2.5 mb-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                <input type="text" id="srLandline" placeholder="Landline Number" class="w-full p-2.5 mb-3 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
-                <button onclick="submitSrOrder()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-bold text-white">Submit SR Order</button>
-            `;
+            alert(data.message || 'Transaction error');
         }
-    }
-
-    function closeServiceModal() {
-        document.getElementById('serviceFormSection').classList.add('hidden');
     }
 
     async function submitReachOrder() {
@@ -197,8 +281,9 @@
         const data = await res.json();
         alert(data.message);
         if(data.success) {
-            closeServiceModal();
-            fetchStatus();
+            document.getElementById('targetId').value = '';
+            document.getElementById('targetPass').value = '';
+            switchSubTab('status');
         }
     }
 
@@ -212,8 +297,10 @@
         const data = await res.json();
         alert(data.message);
         if(data.success) {
-            closeServiceModal();
-            fetchStatus();
+            document.getElementById('srName').value = '';
+            document.getElementById('srMobile').value = '';
+            document.getElementById('srLandline').value = '';
+            switchSubTab('status');
         }
     }
 
@@ -222,7 +309,7 @@
         if(!chatId) return;
 
         const listDiv = document.getElementById('statusList');
-        listDiv.innerHTML = '<p class="text-center text-xs text-slate-500 py-4">Loading updates...</p>';
+        listDiv.innerHTML = '<p class="text-center text-[10px] text-slate-500 py-4 uppercase">Syncing server data...</p>';
 
         try {
             const res = await fetch('/api/app/check-status', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: chatId }) });
@@ -231,38 +318,38 @@
             let html = '';
             if(data.regularOrders) {
                 data.regularOrders.forEach(o => {
-                    let badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-                    if(o.status === 'Completed') badgeColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-                    if(o.status === 'Rejected') badgeColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+                    let badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+                    if(o.status === 'Completed') badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+                    if(o.status === 'Rejected') badgeColor = 'bg-red-500/10 text-red-400 border-red-500/30';
                     
-                    html += `<div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+                    html += `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
                         <div class="flex justify-between items-center mb-1">
-                            <span class="font-bold text-slate-300">⚡ Reach: ${o.targetId}</span>
-                            <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeColor}">${o.status}</span>
+                            <span class="font-bold text-cyan-300">⚡ Reach: ${o.targetId}</span>
+                            <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold ${badgeColor}">${o.status}</span>
                         </div>
-                        ${o.adminReply ? `<div class="mt-1 text-sky-300">💬 Reply: ${o.adminReply}</div>` : ''}
+                        ${o.adminReply ? `<div class="mt-1 text-sky-300 text-[11px]">💬 Reply: ${o.adminReply}</div>` : ''}
                     </div>`;
                 });
             }
 
             if(data.srOrders) {
                 data.srOrders.forEach(s => {
-                    let badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-                    if(s.status === 'Completed') badgeColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-                    if(s.status === 'Rejected') badgeColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+                    let badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+                    if(s.status === 'Completed') badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+                    if(s.status === 'Rejected') badgeColor = 'bg-red-500/10 text-red-400 border-red-500/30';
 
-                    html += `<div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+                    html += `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
                         <div class="flex justify-between items-center mb-1">
-                            <span class="font-bold text-slate-300">📌 SR: ${s.customerName}</span>
-                            <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeColor}">${s.status}</span>
+                            <span class="font-bold text-indigo-300">📌 SR: ${s.customerName}</span>
+                            <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold ${badgeColor}">${s.status}</span>
                         </div>
                     </div>`;
                 });
             }
 
-            listDiv.innerHTML = html || '<div class="text-center py-4 text-slate-500 text-xs">No orders found!</div>';
+            listDiv.innerHTML = html || '<div class="text-center py-4 text-slate-500 text-[10px] uppercase">No active records found</div>';
         } catch (e) {
-            listDiv.innerHTML = '<p class="text-center text-xs text-red-400 py-4">Failed to load status.</p>';
+            listDiv.innerHTML = '<p class="text-center text-xs text-red-400 py-4">Sync error.</p>';
         }
     }
 </script>
