@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JPW REACHED SERVICES BOT - Portal</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { 
@@ -163,12 +164,13 @@
         if (urlParams.get('payment') === 'success') {
             const chatId = urlParams.get('telegramChatId');
             const reaches = urlParams.get('reaches');
+            const orderId = urlParams.get('order_id');
             if (chatId && reaches) {
                 try {
                     await fetch('/api/verify-instant', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ telegramChatId: chatId, reaches })
+                        body: JSON.stringify({ telegramChatId: chatId, reaches, order_id: orderId })
                     });
                     alert(`🎉 Payment Successful! ${reaches} Reaches added.`);
                 } catch(e) {}
@@ -401,7 +403,11 @@
         });
         const data = await res.json();
         if(data.success) {
-            window.location.href = data.paymentUrl;
+            const cashfree = Cashfree({ mode: "production" });
+            cashfree.checkout({
+                paymentSessionId: data.paymentSessionId,
+                redirectTarget: "_self"
+            });
         } else {
             alert('Error: ' + data.message);
         }
