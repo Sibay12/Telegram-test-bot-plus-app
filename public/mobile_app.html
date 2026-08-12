@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPW Cyber-Tech Portal v3.1</title>
+    <title>JPW Cyber-Tech Portal v3.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
         body { 
@@ -94,12 +95,13 @@
             </div>
 
             <div class="flex gap-2 mt-3">
-                <a href="tel:8167443804" class="w-full py-2 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center justify-center transition">📞 SUPPORT: 8167443804</a>
+                <!-- WhatsApp Group Link Button -->
+                <a href="https://chat.whatsapp.com/YOUR_WHATSAPP_GROUP_LINK_HERE" target="_blank" class="w-full py-2 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center justify-center transition">💬 JOIN WHATSAPP GROUP</a>
             </div>
             <button onclick="logout()" class="mt-2 text-[10px] text-red-400 hover:underline uppercase tracking-wider">Disconnect Session</button>
         </div>
 
-        <!-- 1. SERVICES TAB (Reach & SR Forms always visible) -->
+        <!-- 1. SERVICES TAB -->
         <div id="tabServices" class="space-y-3 mb-2">
             <div class="p-3.5 bg-slate-950 rounded-2xl border border-sky-500/30">
                 <h3 class="text-xs font-bold text-sky-400 uppercase mb-2">⚡ SUBMIT REACH ORDER (1 Coin)</h3>
@@ -121,23 +123,23 @@
         <div id="tabPackages" class="hidden space-y-2 mb-2">
             <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
                 <div><span class="font-bold text-purple-400">1 Coin</span><p class="text-[10px] text-slate-400">Price: ₹13</p></div>
-                <button onclick="buyPackage(13, 1)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+                <button onclick="initiatePayment(13, 1)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
             </div>
             <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
                 <div><span class="font-bold text-purple-400">5 Coins</span><p class="text-[10px] text-slate-400">Price: ₹60</p></div>
-                <button onclick="buyPackage(60, 5)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+                <button onclick="initiatePayment(60, 5)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
             </div>
             <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
                 <div><span class="font-bold text-purple-400">10 Coins</span><p class="text-[10px] text-slate-400">Price: ₹115</p></div>
-                <button onclick="buyPackage(115, 10)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+                <button onclick="initiatePayment(115, 10)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
             </div>
             <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
                 <div><span class="font-bold text-purple-400">20 Coins</span><p class="text-[10px] text-slate-400">Price: ₹210</p></div>
-                <button onclick="buyPackage(210, 20)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+                <button onclick="initiatePayment(210, 20)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
             </div>
             <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
                 <div><span class="font-bold text-purple-400">40 Coins</span><p class="text-[10px] text-slate-400">Price: ₹400</p></div>
-                <button onclick="buyPackage(400, 40)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
+                <button onclick="initiatePayment(400, 40)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
             </div>
         </div>
 
@@ -163,8 +165,19 @@
 
 <script>
     let currentUser = null;
+    const cashfree = Cashfree({ mode: "production" });
 
     window.onload = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentStatus = urlParams.get('payment');
+        const tgId = urlParams.get('telegramChatId');
+        const coinsToAdd = urlParams.get('coins');
+        const orderId = urlParams.get('order_id');
+
+        if(paymentStatus === 'success' && tgId && coinsToAdd) {
+            verifyInstantPayment(tgId, coinsToAdd, orderId);
+        }
+
         const savedId = localStorage.getItem('cid');
         const savedChatId = localStorage.getItem('chatid');
         if(savedId && savedChatId) {
@@ -172,6 +185,17 @@
             showDash(currentUser);
         }
     };
+
+    async function verifyInstantPayment(telegramChatId, coins, orderId) {
+        try {
+            const res = await fetch('/api/verify-instant', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId, coins, order_id: orderId }) });
+            const data = await res.json();
+            if(data.success) {
+                alert(`🎉 Payment Successful! Added ${coins} JPW Coins to your account.`);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        } catch(e) {}
+    }
 
     function switchTab(t) {
         document.getElementById('loginForm').classList.toggle('hidden', t !== 'login');
@@ -260,15 +284,18 @@
         }
     }
 
-    async function buyPackage(amount, coins) {
-        const res = await fetch('/api/verify-instant', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId, coins, order_id: `WEB_PAY_${Date.now()}` }) });
-        const data = await res.json();
-        if(data.success) {
-            alert(`✅ Successfully added ${coins} Coins to your account!`);
-            currentUser.jpwCoins = data.user.jpwCoins;
-            document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
-        } else {
-            alert(data.message || 'Transaction error');
+    async function initiatePayment(amount, coins) {
+        try {
+            const res = await fetch('/api/pay', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId, amount, coins }) });
+            const data = await res.json();
+            if(data.success && data.paymentSessionId) {
+                let checkoutOptions = { paymentSessionId: data.paymentSessionId, redirectTarget: "_self" };
+                cashfree.checkout(checkoutOptions);
+            } else {
+                alert(data.message || 'Payment initialization failed');
+            }
+        } catch(e) {
+            alert('Connection error during payment setup.');
         }
     }
 
@@ -283,6 +310,7 @@
         if(data.success) {
             document.getElementById('targetId').value = '';
             document.getElementById('targetPass').value = '';
+            document.getElementById('dCoins').innerText = data.remainingCoins.toFixed(2);
             switchSubTab('status');
         }
     }
@@ -300,6 +328,7 @@
             document.getElementById('srName').value = '';
             document.getElementById('srMobile').value = '';
             document.getElementById('srLandline').value = '';
+            document.getElementById('dCoins').innerText = data.remainingCoins.toFixed(2);
             switchSubTab('status');
         }
     }
