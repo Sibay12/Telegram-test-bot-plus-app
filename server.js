@@ -38,13 +38,13 @@ const CUSTOMER_BOT_TOKENS = [
 // 👑 Your Dedicated Admin Bot Token
 const ADMIN_BOT_TOKEN = '8736759061:AAGaSKOCQ9gUylCsqdAufHenEPeDQhQtSDU';
 
-// 📦 Updated Recharge Packages (Buying JPW Coins)
+// 📦 Updated Recharge Packages (JPW Coins with Stepped Pricing for Bank Settlement Buffer)
 const RECHARGE_PACKAGES = [
-    { amount: 15, coins: 1 },
-    { amount: 65, coins: 5 },
-    { amount: 125, coins: 10 },
-    { amount: 235, coins: 20 },
-    { amount: 425, coins: 40 }
+    { amount: 13, coins: 1 },
+    { amount: 60, coins: 5 },
+    { amount: 115, coins: 10 },
+    { amount: 210, coins: 20 },
+    { amount: 400, coins: 40 }
 ];
 
 let otpStorage = {};
@@ -54,7 +54,7 @@ let adminPendingGiveaway = false;
 let transferSessions = {}; 
 
 let botUsernamesMap = {}; 
-let primaryCustomerBotUsername = 'jpw_reach_bot';
+let primaryCustomerBotUsername = 'JPWREACHSERVICESBOT';
 
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
     .then(async () => {
@@ -73,7 +73,7 @@ const userSchema = new mongoose.Schema({
     name: { type: String, default: 'User' },
     phone: { type: String, default: '' },
     reaches: { type: Number, default: 0 },
-    jpwCoins: { type: Number, default: 0 }, // 🪙 JPW Coins Balance
+    jpwCoins: { type: Number, default: 0 },
     activePackage: { type: String, default: 'No active package' },
     lastBonusTime: { type: Date, default: null },
     referredBy: { type: String, default: null },
@@ -436,7 +436,7 @@ function startCustomerBot(token, isPrimary) {
             if (chatId === ADMIN_CHAT_ID) return;
 
             const text = msg.text.trim();
-            const activeBotUsername = currentBotUsername || primaryCustomerBotUsername || 'jpw_reach_bot';
+            const activeBotUsername = currentBotUsername || primaryCustomerBotUsername || 'JPWREACHSERVICESBOT';
 
             if (text.startsWith('/start')) {
                 const payload = text.split(' ')[1];
@@ -541,7 +541,7 @@ function startCustomerBot(token, isPrimary) {
             const chatId = String(query.message.chat.id);
             const data = query.data;
             let user = await UserModel.findOne({ telegramChatId: chatId });
-            const activeBotUsername = currentBotUsername || primaryCustomerBotUsername || 'jpw_reach_bot';
+            const activeBotUsername = currentBotUsername || primaryCustomerBotUsername || 'JPWREACHSERVICESBOT';
 
             if (data === 'show_referral_info') {
                 const portalUrl = serverPublicUrl || "https://cashtree.space";
