@@ -3,132 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPW REACHED SERVICES BOT - Admin Panel</title>
+    <title>JPW Admin | Premium Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b0f19; margin: 0; padding: 20px; color: #f8fafc; }
-        .container { max-width: 1050px; margin: 0 auto; background: #111827; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); }
-        h2, h3 { color: #38bdf8; text-align: center; }
-        .dev-credit { text-align: center; color: #64748b; font-size: 11px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px; }
-        input, button, textarea { padding: 10px 14px; margin: 5px 0; border: 1px solid #374151; border-radius: 8px; font-size: 14px; background: #1f2937; color: #fff; width: 100%; box-sizing: border-box; }
-        button { background: #0284c7; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; width: auto; }
-        button:hover { background: #0369a1; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #374151; padding: 12px; text-align: left; font-size: 13px; }
-        th { background: #1f2937; color: #38bdf8; }
-        .hidden { display: none; }
-        .danger-btn { background: #dc3545; }
-        .danger-btn:hover { background: #bd2130; }
-        .success-btn { background: #10b981; }
-        .success-btn:hover { background: #059669; }
-        .card { background: #1f2937; padding: 20px; border-radius: 14px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.06); }
-        .logs-box { background: #0a0e17; color: #00ff66; padding: 15px; border-radius: 10px; font-family: monospace; font-size: 12px; height: 180px; overflow-y: scroll; white-space: pre-wrap; margin-top: 10px; border: 1px solid #1e293b; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        @media(max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+        body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .table-row:hover { background: rgba(56, 189, 248, 0.05); }
     </style>
 </head>
-<body>
+<body class="p-6">
 
-<div class="container">
-    <h2>👑 JPW REACHED SERVICES BOT</h2>
-    <div class="dev-credit">Admin Dashboard - Developed by tenaga technology</div>
+<div id="admin-login-box" class="max-w-md mx-auto mt-20 p-8 glass rounded-3xl shadow-2xl text-center">
+    <h2 class="text-2xl font-bold text-sky-400 mb-6">👑 Admin Access</h2>
+    <input type="password" id="adminPass" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 mb-4 text-white" placeholder="Enter Secret PIN">
+    <button onclick="adminLogin()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 rounded-xl font-bold">Login Dashboard</button>
+</div>
 
-    <div id="admin-login-box" class="card" style="max-width: 400px; margin: 60px auto; text-align: center;">
-        <h3>Secure Admin Login</h3>
-        <input type="password" id="adminPass" placeholder="Enter Admin Password">
-        <br>
-        <button onclick="adminLogin()" style="width: 100%; margin-top: 12px; padding: 12px;">Login Dashboard</button>
-        <p id="adminLoginMsg" style="color:#f87171; font-weight:bold; margin-top: 10px;"></p>
+<div id="admin-dashboard" class="hidden max-w-7xl mx-auto">
+    <h1 class="text-3xl font-black text-white mb-8 text-center uppercase tracking-widest">JPW Admin Portal</h1>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="glass p-6 rounded-2xl border-l-4 border-emerald-500">
+            <h3 class="text-slate-400">Total Users</h3>
+            <p id="totalUsers" class="text-3xl font-bold text-white">0</p>
+        </div>
+        <div class="glass p-6 rounded-2xl border-l-4 border-sky-500">
+            <h3 class="text-slate-400">Pending Orders</h3>
+            <p id="pendingOrders" class="text-3xl font-bold text-white">0</p>
+        </div>
+        <div class="glass p-6 rounded-2xl border-l-4 border-amber-500">
+            <h3 class="text-slate-400">Total Revenue Estimate</h3>
+            <p id="totalRevenue" class="text-3xl font-bold text-white">₹0</p>
+        </div>
     </div>
 
-    <div id="admin-dashboard" class="hidden">
-        
-        <div class="grid-2">
-            <div class="card" style="background: #151c28;">
-                <h4 style="margin-top: 0; color: #38bdf8;">🎁 Split Giveaway Control</h4>
-                <p style="font-size: 12px; color: #9ca3af;">Enter total amount to split among all users:</p>
-                <input type="number" id="giveawayAmount" placeholder="e.g. 2 or 0.001" step="any">
-                <button class="success-btn" onclick="triggerGiveaway()" style="margin-top: 8px;">🚀 Send Split Giveaway</button>
-            </div>
-
-            <div class="card" style="background: #151c28;">
-                <h4 style="margin-top: 0; color: #38bdf8;">📢 Broadcast Announcement</h4>
-                <p style="font-size: 12px; color: #9ca3af;">Send message to all registered users:</p>
-                <textarea id="broadcastMsg" placeholder="Type announcement here..." rows="2"></textarea>
-                <button class="success-btn" onclick="triggerBroadcast()" style="margin-top: 8px;">📢 Broadcast Now</button>
-            </div>
-        </div>
-
-        <!-- 👥 Referral Tracking Section -->
-        <div class="card" style="background: #151c28;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="margin: 0; color: #f59e0b;">👥 Referral Tracking & Hierarchy Check</h4>
-                <button onclick="loadReferrals()" class="success-btn" style="padding: 6px 14px; font-size: 12px;">🔄 Refresh Referrals</button>
-            </div>
-            <div style="overflow-x: auto; max-height: 250px; overflow-y: scroll; margin-top: 10px;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Referred User</th>
-                            <th>Referred User Chat ID</th>
-                            <th>Referred By (Referrer)</th>
-                            <th>₹100+ Recharge Done?</th>
-                        </tr>
-                    </thead>
-                    <tbody id="referrals-table">
-                        <tr><td colspan="4" style="text-align:center;">Loading referrals...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="card" style="background: #151c28;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="margin: 0; color: #00ff66;">💻 Live Server Activity Logs (Debug)</h4>
-                <button onclick="loadAdminData()" class="success-btn" style="padding: 6px 14px; font-size: 12px;">🔄 Refresh Logs</button>
-            </div>
-            <div id="serverLogs" class="logs-box">Logs load ho rahe hain...</div>
-        </div>
-
-        <div class="card" style="border: 2px dashed #dc3545; background: rgba(220,53,69,0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-            <div>
-                <h4 style="margin: 0; color: #f87171;">⚠️ Danger Zone: Server Reset</h4>
-                <p style="margin: 5px 0 0 0; font-size: 13px; color: #9ca3af;">Security PIN (9999) enter karke pura database clear kiya ja sakta hai.</p>
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <input type="password" id="clearPin" placeholder="Enter PIN (9999)" style="width: 140px; margin: 0;">
-                <button class="danger-btn" onclick="clearEntireDatabase()">🧹 Clear Server</button>
-            </div>
-        </div>
-
-        <h3>📦 All Customer Orders</h3>
-        <div style="overflow-x: auto;">
-            <table>
+    <!-- Users Management Table -->
+    <div class="glass p-6 rounded-3xl mb-8">
+        <h3 class="text-xl font-bold mb-4 text-sky-400">👤 User Coin Management</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
                 <thead>
-                    <tr>
-                        <th>Telegram ID</th>
-                        <th>Target ID / Pass</th>
-                        <th>Status & Reply</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="orders-table"></tbody>
-            </table>
-        </div>
-
-        <h3 style="margin-top: 35px;">👥 Registered Customers & Reaches</h3>
-        <div style="overflow-x: auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Telegram ID</th>
-                        <th>Name</th>
-                        <th>Reaches</th>
-                        <th>Manage Reaches</th>
-                        <th>Actions</th>
+                    <tr class="text-slate-400 border-b border-slate-700">
+                        <th class="p-3">User Name</th>
+                        <th class="p-3">Chat ID</th>
+                        <th class="p-3">Coins Balance</th>
+                        <th class="p-3">Actions (Coins)</th>
+                        <th class="p-3">Delete</th>
                     </tr>
                 </thead>
                 <tbody id="users-table"></tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Announcements -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="glass p-6 rounded-3xl">
+            <h3 class="text-lg font-bold mb-3 text-emerald-400">📢 Global Announcement</h3>
+            <textarea id="broadcastMsg" class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 mb-2" rows="3"></textarea>
+            <button onclick="triggerBroadcast()" class="w-full py-2 bg-emerald-600 rounded-lg font-bold">Broadcast Now</button>
+        </div>
+        <div class="glass p-6 rounded-3xl">
+            <h3 class="text-lg font-bold mb-3 text-rose-400">⚠️ Danger Zone</h3>
+            <input type="password" id="clearPin" class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 mb-2" placeholder="PIN: 9999">
+            <button onclick="clearEntireDatabase()" class="w-full py-2 bg-rose-600 rounded-lg font-bold">Clear All Data</button>
         </div>
     </div>
 </div>
@@ -146,126 +85,41 @@
             document.getElementById('admin-login-box').classList.add('hidden');
             document.getElementById('admin-dashboard').classList.remove('hidden');
             loadAdminData();
-            loadReferrals();
-            setInterval(loadLogs, 10000);
         } else {
-            document.getElementById('adminLoginMsg').innerText = data.message;
+            alert('Wrong Password!');
         }
     }
 
     async function loadAdminData() {
-        loadLogs();
         const res = await fetch('/api/admin/data');
         const data = await res.json();
         if(!data.success) return;
 
-        let orderHtml = '';
-        data.orders.forEach(ord => {
-            orderHtml += `<tr>
-                <td><code>${ord.telegramChatId}</code></td>
-                <td>ID: <code>${ord.targetId}</code><br>Pass: <code>${ord.targetPass}</code></td>
-                <td><b>${ord.status}</b><br><small style="color:#4ade80;">${ord.adminReply ? 'Reply: ' + ord.adminReply : ''}</small></td>
-                <td>
-                    <button onclick="orderAction('${ord._id}', 'accept')">Accept</button>
-                    <button class="danger-btn" onclick="orderAction('${ord._id}', 'reject')">Reject</button>
-                    <button onclick="orderAction('${ord._id}', 'inprogress')">In-Prog</button>
-                    <button class="success-btn" onclick="orderAction('${ord._id}', 'complete')">Complete</button>
-                </td>
-            </tr>`;
-        });
-        document.getElementById('orders-table').innerHTML = orderHtml || `<tr><td colspan="4" style="text-align:center;">Koi order nahi mila</td></tr>`;
+        // Update Stats
+        document.getElementById('totalUsers').innerText = data.users.length;
+        document.getElementById('pendingOrders').innerText = data.orders.filter(o => o.status === 'Pending').length;
 
+        // User Table
         let userHtml = '';
         data.users.forEach(usr => {
-            userHtml += `<tr>
-                <td><code>${usr.telegramChatId}</code></td>
-                <td><b>${usr.name}</b></td>
-                <td><span style="background:#10b981; color:#fff; padding:4px 10px; border-radius:6px; font-weight:bold;">${usr.reaches.toFixed(4)}</span></td>
-                <td>
-                    <button onclick="updateReaches('${usr._id}', 'add', 1)">+1</button>
-                    <button onclick="updateReaches('${usr._id}', 'add', 5)">+5</button>
-                    <button class="danger-btn" onclick="updateReaches('${usr._id}', 'deduct', 1)">-1</button>
+            userHtml += `<tr class="table-row border-b border-slate-700">
+                <td class="p-3">${usr.name}</td>
+                <td class="p-3 text-sky-300">${usr.telegramChatId}</td>
+                <td class="p-3 font-bold text-amber-400">${usr.jpwCoins.toFixed(2)}</td>
+                <td class="p-3 flex gap-2">
+                    <button class="bg-emerald-700 px-3 py-1 rounded" onclick="updateCoins('${usr._id}', 'add', 1)">+1</button>
+                    <button class="bg-emerald-700 px-3 py-1 rounded" onclick="updateCoins('${usr._id}', 'add', 5)">+5</button>
+                    <button class="bg-rose-700 px-3 py-1 rounded" onclick="updateCoins('${usr._id}', 'deduct', 1)">-1</button>
                 </td>
-                <td>
-                    <button class="danger-btn" onclick="deleteUser('${usr._id}')">Delete</button>
+                <td class="p-3">
+                    <button class="text-rose-500" onclick="deleteUser('${usr._id}')">Delete</button>
                 </td>
             </tr>`;
         });
-        document.getElementById('users-table').innerHTML = userHtml || `<tr><td colspan="5" style="text-align:center;">Koi customer nahi mila</td></tr>`;
+        document.getElementById('users-table').innerHTML = userHtml;
     }
 
-    async function loadReferrals() {
-        try {
-            const res = await fetch('/api/admin/referrals');
-            const data = await res.json();
-            if(data.success) {
-                let html = '';
-                data.referrals.forEach(ref => {
-                    html += `<tr>
-                        <td><b>${ref.userName}</b></td>
-                        <td><code>${ref.userChatId}</code></td>
-                        <td><b>${ref.referrerName}</b> (<code>${ref.referrerChatId}</code>)</td>
-                        <td>${ref.hasRecharged100 ? '<span style="color:#4ade80;">Yes ✅</span>' : '<span style="color:#f87171;">No ❌</span>'}</td>
-                    </tr>`;
-                });
-                document.getElementById('referrals-table').innerHTML = html || `<tr><td colspan="4" style="text-align:center;">Koi referral record nahi mila</td></tr>`;
-            }
-        } catch(e) {}
-    }
-
-    async function triggerGiveaway() {
-        const totalAmount = document.getElementById('giveawayAmount').value.trim();
-        if(!totalAmount) return alert('Please enter giveaway amount!');
-        if(!confirm(`Kya aap sabhi users mein ${totalAmount} reaches split karna chahte hain?`)) return;
-
-        const res = await fetch('/api/admin/giveaway', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ totalAmount })
-        });
-        const data = await res.json();
-        alert(data.message);
-        document.getElementById('giveawayAmount').value = '';
-        loadAdminData();
-    }
-
-    async function triggerBroadcast() {
-        const message = document.getElementById('broadcastMsg').value.trim();
-        if(!message) return alert('Please type announcement message!');
-        if(!confirm('Kya aap sabhi users ko ye announcement bhejna chahte hain?')) return;
-
-        const res = await fetch('/api/admin/broadcast', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ message })
-        });
-        const data = await res.json();
-        alert(data.message);
-        document.getElementById('broadcastMsg').value = '';
-    }
-
-    async function loadLogs() {
-        try {
-            const res = await fetch('/api/admin/logs');
-            const data = await res.json();
-            if(data.success) {
-                const logBox = document.getElementById('serverLogs');
-                logBox.innerText = data.logs;
-                logBox.scrollTop = logBox.scrollHeight;
-            }
-        } catch(e) {}
-    }
-
-    async function orderAction(orderId, action) {
-        await fetch('/api/admin/order-action', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ orderId, action })
-        });
-        loadAdminData();
-    }
-
-    async function updateReaches(userId, action, count) {
+    async function updateCoins(userId, action, count) {
         await fetch('/api/admin/update-reaches', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -275,7 +129,7 @@
     }
 
     async function deleteUser(userId) {
-        if(!confirm('Kya aap is customer ko delete karna chahte hain?')) return;
+        if(!confirm('Sure?')) return;
         await fetch('/api/admin/delete-user', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -283,26 +137,16 @@
         });
         loadAdminData();
     }
-
-    async function clearEntireDatabase() {
-        const pin = document.getElementById('clearPin').value.trim();
-        if(pin !== '9999') {
-            alert('❌ Incorrect Security PIN! Server reset abort ho gaya.');
-            return;
-        }
-        if(!confirm('⚠️ WARNING: Isse sabhi users aur orders completely delete ho jayenge! Kya aap sure hain?')) return;
-        
-        const res = await fetch('/api/admin/clear-database', {
+    
+    async function triggerBroadcast() {
+        const message = document.getElementById('broadcastMsg').value;
+        await fetch('/api/admin/broadcast', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ pin })
+            body: JSON.stringify({ message })
         });
-        const data = await res.json();
-        alert(data.message);
-        document.getElementById('clearPin').value = '';
-        loadAdminData();
+        alert('Sent!');
     }
 </script>
-
 </body>
 </html>
