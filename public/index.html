@@ -43,11 +43,11 @@
         }
         .pkg-card:hover { border-color: rgba(56,189,248,0.3); background: rgba(15, 23, 42, 0.7); }
         .pkg-card button { width: auto; padding: 8px 18px; margin: 0; font-size: 14px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
-        .badge { background: #10b981; color: white; padding: 5px 14px; border-radius: 20px; font-size: 14px; font-weight: bold; box-shadow: 0 0 10px rgba(16,185,129,0.4); }
+        .badge { background: #f59e0b; color: white; padding: 5px 14px; border-radius: 20px; font-size: 14px; font-weight: bold; box-shadow: 0 0 10px rgba(245,158,11,0.4); }
         .hidden { display: none; }
         .user-box { background: rgba(15, 23, 42, 0.6); padding: 20px; border-radius: 18px; text-align: center; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 20px; }
         .bonus-btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; box-shadow: 0 6px 20px rgba(245,158,11,0.3); }
-        .ad-btn { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; box-shadow: 0 6px 20px rgba(139,92,246,0.3); }
+        .convert-btn { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; box-shadow: 0 6px 20px rgba(139,92,246,0.3); }
         .transfer-btn { background: linear-gradient(135deg, #06b6d4, #0891b2); color: #fff; box-shadow: 0 6px 20px rgba(6,182,212,0.3); }
 
         .marketing-banner {
@@ -116,8 +116,8 @@
     <!-- Main Dashboard -->
     <div id="dashboard-screen" class="hidden">
         <div class="marketing-banner">
-            <div class="pulse-text">🔥 Win anywhere from 100 to 0.0001 Reach! 🔥</div>
-            <p style="font-size: 12px; color: #fdf2f8; margin: 6px 0 12px 0;">(Refer & Earn: When your friend completes ₹100+ recharge)</p>
+            <div class="pulse-text">🔥 Win JPW Coins via Refer & Earn! 🔥</div>
+            <p style="font-size: 12px; color: #fdf2f8; margin: 6px 0 12px 0;">(When your friend completes ₹100+ recharge)</p>
             <input type="text" id="referralLinkInput" readonly style="background: rgba(0,0,0,0.4); text-align: center; font-size: 13px; padding: 12px; margin: 0; color: #38bdf8; border: 1px dashed #38bdf8;" onclick="copyReferralLink()" value="Loading link...">
             <button onclick="copyReferralLink()" style="background: #10b981; color: white; padding: 12px; margin-top: 10px; font-size: 14px; box-shadow: 0 4px 15px rgba(16,185,129,0.5);">📋 Copy Referral Link</button>
         </div>
@@ -125,26 +125,27 @@
         <div class="user-box">
             <p style="margin: 6px 0;">👤 <b>Name:</b> <span id="userName" style="color: #38bdf8;"></span></p>
             <p style="margin: 6px 0;">💬 <b>Telegram ID:</b> <span id="dispChatId" style="font-size: 13px; color: #94a3b8;"></span></p>
-            <p style="margin: 10px 0 6px 0;">💎 <b>Balance:</b> <span id="userBalance" class="badge">0</span> Reaches</p>
+            <p style="margin: 10px 0 6px 0;">🪙 <b>JPW Coins:</b> <span id="userCoins" class="badge">0</span> Coins</p>
+            <p style="margin: 6px 0; font-size: 13px; color: #94a3b8;">💎 <b>Reaches:</b> <span id="userReaches">0</span></p>
             <button onclick="claimDailyBonus()" class="bonus-btn">🎁 Daily Bonus</button>
-            <button onclick="watchAdTask()" class="ad-btn">🎬 Watch Ad / Spin Task</button>
-            <button onclick="openTransferModal()" class="transfer-btn">🤝 Share Reach to Friend</button>
+            <button onclick="convertCoins()" class="convert-btn">🔄 Convert Coins to Reaches</button>
+            <button onclick="openTransferModal()" class="transfer-btn">🤝 Share Coins to Friend</button>
             <button onclick="logout()" style="background: #ef4444; color: #fff; width:auto; padding:8px 22px; margin-top:12px; font-size:14px; box-shadow: 0 4px 15px rgba(239,68,68,0.4);">🚪 Logout</button>
         </div>
 
-        <!-- Reach Transfer Form -->
+        <!-- Coin Transfer Form -->
         <div id="transfer-box" class="card hidden" style="background: rgba(15,23,42,0.8); padding: 15px; border-radius: 14px; margin-bottom: 20px; border: 1px solid rgba(6,182,212,0.3);">
-            <h4 style="margin: 0 0 10px 0; color: #06b6d4; text-align: center;">🤝 Transfer Reach to User</h4>
+            <h4 style="margin: 0 0 10px 0; color: #06b6d4; text-align: center;">🤝 Transfer JPW Coins</h4>
             <input type="text" id="receiverChatId" placeholder="Receiver Telegram Chat ID">
-            <input type="number" id="transferAmount" placeholder="Amount of Reaches" step="any">
-            <button onclick="transferReach()" class="transfer-btn" style="margin-top: 5px;">📤 Send Reaches</button>
+            <input type="number" id="transferAmount" placeholder="Amount of Coins" step="any">
+            <button onclick="transferCoins()" class="transfer-btn" style="margin-top: 5px;">📤 Send Coins</button>
             <button onclick="toggleTransferBox()" style="background: rgba(255,255,255,0.08); margin-top: 5px;">Cancel</button>
         </div>
 
-        <h3 style="margin-top:25px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; font-size: 18px;">📦 Buy Recharge Packages</h3>
+        <h3 style="margin-top:25px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; font-size: 18px;">📦 Buy JPW Coins Packages</h3>
         <div id="packages-list"></div>
 
-        <h3 style="margin-top:25px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; font-size: 18px;">⚡ Submit New Order</h3>
+        <h3 style="margin-top:25px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; font-size: 18px;">⚡ Submit New Order (Costs 1 Coin)</h3>
         <input type="text" id="targetId" placeholder="Target Username / ID">
         <input type="password" id="targetPass" placeholder="Target Password">
         <button onclick="submitOrder()">🚀 Submit Order Now</button>
@@ -174,16 +175,16 @@
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('payment') === 'success') {
             const chatId = urlParams.get('telegramChatId');
-            const reaches = urlParams.get('reaches');
+            const coins = urlParams.get('coins');
             const orderId = urlParams.get('order_id');
-            if (chatId && reaches) {
+            if (chatId && coins) {
                 try {
                     await fetch('/api/verify-instant', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ telegramChatId: chatId, reaches, order_id: orderId })
+                        body: JSON.stringify({ telegramChatId: chatId, coins, order_id: orderId })
                     });
-                    alert(`🎉 Payment Successful! ${reaches} Reaches added.`);
+                    alert(`🎉 Payment Successful! ${coins} JPW Coins added.`);
                 } catch(e) {}
                 window.location.href = '/';
                 return;
@@ -257,7 +258,8 @@
                 document.getElementById('dashboard-screen').classList.remove('hidden');
                 document.getElementById('userName').innerText = data.user.name;
                 document.getElementById('dispChatId').innerText = data.user.telegramChatId;
-                document.getElementById('userBalance').innerText = data.user.reaches.toFixed(4);
+                document.getElementById('userCoins').innerText = data.user.jpwCoins.toFixed(2);
+                document.getElementById('userReaches').innerText = data.user.reaches.toFixed(4);
                 setupReferralLink(data.user.telegramChatId);
                 loadPackages();
             } else {
@@ -287,7 +289,8 @@
                 document.getElementById('dashboard-screen').classList.remove('hidden');
                 document.getElementById('userName').innerText = data.user.name;
                 document.getElementById('dispChatId').innerText = data.user.telegramChatId;
-                document.getElementById('userBalance').innerText = data.user.reaches.toFixed(4);
+                document.getElementById('userCoins').innerText = data.user.jpwCoins.toFixed(2);
+                document.getElementById('userReaches').innerText = data.user.reaches.toFixed(4);
                 setupReferralLink(data.user.telegramChatId);
                 loadPackages();
             } else {
@@ -329,26 +332,48 @@
         document.getElementById('transfer-box').classList.add('hidden');
     }
 
-    async function transferReach() {
+    async function transferCoins() {
         const receiverChatId = document.getElementById('receiverChatId').value.trim();
         const amount = document.getElementById('transferAmount').value.trim();
         if(!receiverChatId || !amount) return alert('All fields are required');
 
         try {
-            const res = await fetch('/api/transfer-reach', {
+            const res = await fetch('/api/transfer-coins', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ senderChatId: telegramChatId, receiverChatId, amount })
             });
             const data = await res.json();
             if(data.success) {
-                alert(`✅ Successfully transferred ${amount} reaches!`);
-                document.getElementById('userBalance').innerText = data.sender.reaches.toFixed(4);
+                alert(`✅ Successfully transferred ${amount} JPW Coins!`);
+                document.getElementById('userCoins').innerText = data.sender.jpwCoins.toFixed(2);
                 document.getElementById('receiverChatId').value = '';
                 document.getElementById('transferAmount').value = '';
                 toggleTransferBox();
             } else {
                 alert(data.message || 'Transfer failed');
+            }
+        } catch(e) {
+            alert('Network Error!');
+        }
+    }
+
+    async function convertCoins() {
+        const amt = prompt("Enter how many JPW Coins you want to convert to Reaches:");
+        if(!amt) return;
+        try {
+            const res = await fetch('/api/convert-coins', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegramChatId, amount: amt })
+            });
+            const data = await res.json();
+            if(data.success) {
+                alert(`✅ Successfully converted ${amt} Coins to Reaches!`);
+                document.getElementById('userCoins').innerText = data.user.jpwCoins.toFixed(2);
+                document.getElementById('userReaches').innerText = data.user.reaches.toFixed(4);
+            } else {
+                alert(data.message || 'Conversion failed');
             }
         } catch(e) {
             alert('Network Error!');
@@ -364,27 +389,13 @@
             });
             const data = await res.json();
             if(data.success) {
-                alert(`🎉 Daily Bonus Claimed Successfully! +${data.randomBonus.toFixed(4)} Reaches added.`);
-                document.getElementById('userBalance').innerText = data.user.reaches.toFixed(4);
+                alert(`🎉 Daily Bonus Claimed! +${data.randomBonus} JPW Coins added.`);
+                document.getElementById('userCoins').innerText = data.user.jpwCoins.toFixed(2);
             } else {
                 alert(data.message || 'Already claimed today!');
             }
         } catch(e) {
             alert('Network Error!');
-        }
-    }
-
-    async function watchAdTask() {
-        try {
-            const res = await fetch('/api/claim-ad-reward', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ telegramChatId })
-            });
-            const data = await res.json();
-            alert(data.message || '⏳ This feature is coming soon!');
-        } catch(e) {
-            alert('⏳ This feature is coming soon!');
         }
     }
 
@@ -398,23 +409,23 @@
         const data = await res.json();
         let html = '';
         data.packages.forEach(pkg => {
-            const perReach = (pkg.amount / pkg.reaches).toFixed(2);
+            const perCoin = (pkg.amount / pkg.coins).toFixed(2);
             html += `<div class="pkg-card">
                 <div>
-                    <span>₹${pkg.amount} ➡️ <b>${pkg.reaches} Reaches</b></span>
-                    <div style="font-size: 11px; color: #38bdf8; margin-top: 3px;">(₹${perReach} per Reach)</div>
+                    <span>₹${pkg.amount} ➡️ <b>${pkg.coins} JPW Coins</b></span>
+                    <div style="font-size: 11px; color: #38bdf8; margin-top: 3px;">(₹${perCoin} per Coin)</div>
                 </div>
-                <button onclick="buyPackage(${pkg.amount}, ${pkg.reaches})">💳 Pay</button>
+                <button onclick="buyPackage(${pkg.amount}, ${pkg.coins})">💳 Pay</button>
             </div>`;
         });
         document.getElementById('packages-list').innerHTML = html;
     }
 
-    async function buyPackage(amount, reaches) {
+    async function buyPackage(amount, coins) {
         const res = await fetch('/api/pay', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ telegramChatId, amount, reaches })
+            body: JSON.stringify({ telegramChatId, amount, coins })
         });
         const data = await res.json();
         if(data.success) {
