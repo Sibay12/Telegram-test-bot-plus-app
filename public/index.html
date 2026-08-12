@@ -97,9 +97,18 @@
     <!-- Web Login Screen -->
     <div id="web-login-screen" class="hidden">
         <h3 style="text-align: center; color: #cbd5e1; margin-bottom: 5px;">Web Login via Telegram ID</h3>
-        <p style="font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 20px;">Send `/start` in bot to get your Chat ID and enter it here:</p>
-        <input type="text" id="webChatIdInput" placeholder="Enter Telegram Chat ID">
-        <button onclick="requestOtp()">📩 Send OTP</button>
+        <p style="font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 15px;">To get your Chat ID, start our official Telegram bot first:</p>
+        
+        <!-- Direct Bot Launch / Start Button -->
+        <a id="launchBotBtn" href="https://t.me/JPWREACHSERVICESBOT" target="_blank" style="display: block; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; text-align: center; padding: 14px; border-radius: 12px; font-weight: bold; text-decoration: none; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(37,99,235,0.4);">
+            🤖 Start Telegram Bot & Get ID
+        </a>
+
+        <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 15px 0; padding-top: 15px;">
+            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 10px;">Already have your Chat ID? Enter it below:</p>
+            <input type="text" id="webChatIdInput" placeholder="Enter Telegram Chat ID">
+            <button onclick="requestOtp()">📩 Send OTP</button>
+        </div>
         <p id="loginMsg" style="color:#f87171; text-align:center; font-weight:bold; margin-top: 10px;"></p>
     </div>
 
@@ -306,11 +315,11 @@
         try {
             const res = await fetch('/api/bot-info');
             const data = await res.json();
-            const botUsername = (data.success && data.botUsername) ? data.botUsername : 'jpw_reach_bot';
+            const botUsername = (data.success && data.botUsername) ? data.botUsername : 'JPWREACHSERVICESBOT';
             const refLink = `https://t.me/${botUsername}?start=ref_${chatId}`;
             document.getElementById('referralLinkInput').value = refLink;
         } catch(e) {
-            const refLink = `https://t.me/jpw_reach_bot?start=ref_${chatId}`;
+            const refLink = `https://t.me/JPWREACHSERVICESBOT?start=ref_${chatId}`;
             document.getElementById('referralLinkInput').value = refLink;
         }
     }
