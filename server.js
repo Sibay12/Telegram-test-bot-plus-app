@@ -51,6 +51,7 @@ let otpStorage = {};
 let adminPendingReply = {};
 let adminPendingSrReply = {};
 let primaryCustomerBotUsername = 'JPWREACHSERVICESBOT';
+let serverPublicUrl = '';
 
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
     .then(async () => {
@@ -60,6 +61,7 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
         } catch(e) {}
         initAllBots();
         startOrderCleanupTimer();
+        startBackgroundGreetingTimer();
     })
     .catch(err => debugLog('Database', '❌ DB Error:', err.message));
 
@@ -69,10 +71,6 @@ const userSchema = new mongoose.Schema({
     reaches: { type: Number, default: 0 },
     jpwCoins: { type: Number, default: 0 },
     activePackage: { type: String, default: 'No active package' },
-    lastBonusTime: { type: Date, default: null },
-    referredBy: { type: String, default: null },
-    hasRecharged100: { type: Boolean, default: false },
-    referralRewarded: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -85,7 +83,6 @@ const orderSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// 📌 SR (JPW Reached Services) Schema
 const srSchema = new mongoose.Schema({
     telegramChatId: String,
     customerName: String,
@@ -104,8 +101,6 @@ const UserModel = mongoose.model('User', userSchema);
 const OrderModel = mongoose.model('Order', orderSchema);
 const SrModel = mongoose.model('SrService', srSchema);
 const UsedUtrModel = mongoose.model('UsedUtr', usedUtrSchema);
-
-let serverPublicUrl = '';
 
 function initAllBots() {
     CUSTOMER_BOT_TOKENS.forEach((token, idx) => {
@@ -126,24 +121,32 @@ function startOrderCleanupTimer() {
     }, 60 * 60 * 1000);
 }
 
-// 🔔 Regular Order Notification to Admin Bot
+// 🕒 Dynamic Background Comfort Message (Every 20 mins)
+function startBackgroundGreetingTimer() {
+    setInterval(async () => {
+        try {
+            const allUsers = await UserModel.find({});
+            for (let user of allUsers) {
+                if (!user.telegramChatId) continue;
+                const comfortMessage = `🌟 **Hello, ${user.name || 'Engineer'}!** 🌿\n\nEverything is running smoothly on the portal. Stay relaxed! 😌\n\n*(JPW ENGINEER PORTAL)*`;
+                if (CUSTOMER_BOT_TOKENS[0]) {
+                    const tempBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
+                    await tempBot.sendMessage(user.telegramChatId, comfortMessage, { parse_mode: 'Markdown' }).catch(() => {});
+                }
+            }
+        } catch (err) {}
+    }, 20 * 60 * 1000);
+}
+
+// 🔔 Dynamic Notification Handler
 async function notifyAdminAndUser(order, user, messageText) {
     try {
         let adminKeyboard = {
             reply_markup: {
                 inline_keyboard: [
-                    [
-                        { text: "✅ Accept", callback_data: `accept_${order._id}` },
-                        { text: "❌ Reject", callback_data: `reject_${order._id}` }
-                    ],
-                    [
-                        { text: "⏳ In Progress", callback_data: `inprogress_${order._id}` },
-                        { text: "🎉 Complete", callback_data: `complete_${order._id}` }
-                    ],
-                    [
-                        { text: "💬 Reply", callback_data: `reply_${order._id}` },
-                        { text: "🚫 Cancel & Refund", callback_data: `cancel_${order._id}` }
-                    ]
+                    [{ text: "✅ Accept", callback_data: `accept_${order._id}` }, { text: "❌ Reject", callback_data: `reject_${order._id}` }],
+                    [{ text: "⏳ In Progress", callback_data: `inprogress_${order._id}` }, { text: "🎉 Complete", callback_data: `complete_${order._id}` }],
+                    [{ text: "💬 Reply", callback_data: `reply_${order._id}` }, { text: "🚫 Cancel & Refund", callback_data: `cancel_${order._id}` }]
                 ]
             }
         };
@@ -155,7 +158,6 @@ async function notifyAdminAndUser(order, user, messageText) {
     } catch (e) {}
 }
 
-// 🔔 SR Order Notification to Admin Bot
 async function notifyAdminSrBot(srOrder) {
     try {
         if (ADMIN_BOT_TOKEN) {
@@ -163,17 +165,9 @@ async function notifyAdminSrBot(srOrder) {
             let keyboard = {
                 reply_markup: {
                     inline_keyboard: [
-                        [
-                            { text: "✅ Accept", callback_data: `sraccept_${srOrder._id}` },
-                            { text: "❌ Reject", callback_data: `srreject_${srOrder._id}` }
-                        ],
-                        [
-                            { text: "⏳ In Progress", callback_data: `srinprog_${srOrder._id}` },
-                            { text: "🎉 Complete", callback_data: `srcomp_${srOrder._id}` }
-                        ],
-                        [
-                            { text: "💬 Reply", callback_data: `srreply_${srOrder._id}` }
-                        ]
+                        [{ text: "✅ Accept", callback_data: `sraccept_${srOrder._id}` }, { text: "❌ Reject", callback_data: `srreject_${srOrder._id}` }],
+                        [{ text: "⏳ In Progress", callback_data: `srinprog_${srOrder._id}` }, { text: "🎉 Complete", callback_data: `srcomp_${srOrder._id}` }],
+                        [{ text: "💬 Reply", callback_data: `srreply_${srOrder._id}` }]
                     ]
                 }
             };
@@ -207,7 +201,7 @@ function startAdminBot(token) {
                     await order.save();
                     if (CUSTOMER_BOT_TOKENS[0]) {
                         const tempCustBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
-                        await tempCustBot.sendMessage(order.telegramChatId, `💬 **Admin Reply regarding your Order**\n🎯 Target ID: \`${order.targetId}\`\n\n📢 *${text}*`, { parse_mode: 'Markdown' }).catch(()=>{});
+                        await tempCustBot.sendMessage(order.telegramChatId, `💬 **Admin Update:**\n🎯 Target ID: \`${order.targetId}\`\n\n📢 *${text}*`, { parse_mode: 'Markdown' }).catch(()=>{});
                     }
                     bot.sendMessage(chatId, `✅ Reply sent successfully!`);
                 }
@@ -223,9 +217,9 @@ function startAdminBot(token) {
                     await srOrder.save();
                     if (CUSTOMER_BOT_TOKENS[0]) {
                         const tempCustBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
-                        await tempCustBot.sendMessage(srOrder.telegramChatId, `💬 **Admin Update for SR (${srOrder.customerName}):**\n\n📢 *${text}*`, { parse_mode: 'Markdown' }).catch(()=>{});
+                        await tempCustBot.sendMessage(srOrder.telegramChatId, `💬 **Admin SR Update (${srOrder.customerName}):**\n\n📢 *${text}*`, { parse_mode: 'Markdown' }).catch(()=>{});
                     }
-                    bot.sendMessage(chatId, `✅ SR Reply sent successfully to Engineer!`);
+                    bot.sendMessage(chatId, `✅ SR Reply sent successfully!`);
                 }
                 return;
             }
@@ -247,29 +241,19 @@ function startAdminBot(token) {
                 if (action === 'srreply') {
                     adminPendingSrReply[chatId] = srId;
                     bot.answerCallbackQuery(query.id, { text: 'Send reply...' });
-                    bot.sendMessage(chatId, `✍️ Send reply message for SR Order (Customer: ${srOrder.customerName}):`, { parse_mode: 'Markdown' });
+                    bot.sendMessage(chatId, `✍️ Send reply message for SR (${srOrder.customerName}):`, { parse_mode: 'Markdown' });
                     return;
-                } else if (action === 'sraccept') {
-                    srOrder.status = 'Accepted';
-                    statusMsg = 'Accepted ✅';
-                } else if (action === 'srreject') {
-                    srOrder.status = 'Rejected';
-                    statusMsg = 'Rejected ❌ (1 Coin Refunded)';
-                    if (user) { user.jpwCoins += 1; await user.save(); }
-                } else if (action === 'srinprog') {
-                    srOrder.status = 'In Progress';
-                    statusMsg = 'In Progress ⏳';
-                } else if (action === 'srcomp') {
-                    srOrder.status = 'Completed';
-                    statusMsg = 'Completed 🎉';
-                }
+                } else if (action === 'sraccept') { srOrder.status = 'Accepted'; statusMsg = 'Accepted ✅'; }
+                else if (action === 'srreject') { srOrder.status = 'Rejected'; statusMsg = 'Rejected ❌ (1 Coin Refunded)'; if(user){user.jpwCoins+=1;await user.save();} }
+                else if (action === 'srinprog') { srOrder.status = 'In Progress'; statusMsg = 'In Progress ⏳'; }
+                else if (action === 'srcomp') { srOrder.status = 'Completed'; statusMsg = 'Completed 🎉'; }
 
                 await srOrder.save();
                 bot.answerCallbackQuery(query.id, { text: 'Status updated!' });
 
                 let hideKeyboard = (srOrder.status === 'Completed' || srOrder.status === 'Rejected');
                 try {
-                    await bot.editMessageText(`📌 **SR Order Status: ${statusMsg}**\n👤 Customer: ${srOrder.customerName}\n📞 Mobile: \`${srOrder.mobileNumber}\``, {
+                    await bot.editMessageText(`📌 **SR Status: ${statusMsg}**\n👤 Customer: ${srOrder.customerName}\n📞 Mobile: \`${srOrder.mobileNumber}\``, {
                         chat_id: chatId,
                         message_id: query.message.message_id,
                         parse_mode: 'Markdown',
@@ -279,10 +263,9 @@ function startAdminBot(token) {
 
                 if (CUSTOMER_BOT_TOKENS[0]) {
                     const tempCustBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
-                    await tempCustBot.sendMessage(srOrder.telegramChatId, `📌 **SR Order Status Update**\n\n👤 Customer: ${srOrder.customerName}\n📌 Status: *${statusMsg}*`, { parse_mode: 'Markdown' }).catch(()=>{});
+                    await tempCustBot.sendMessage(srOrder.telegramChatId, `📌 **SR Status Update**\n👤 Customer: ${srOrder.customerName}\n📌 Status: *${statusMsg}*`, { parse_mode: 'Markdown' }).catch(()=>{});
                 }
             } else {
-                // Regular Order Actions
                 const [action, orderId] = data.split('_');
                 let order = await OrderModel.findById(orderId);
                 if (!order) { bot.answerCallbackQuery(query.id, { text: 'Order not found!' }); return; }
@@ -316,7 +299,7 @@ function startAdminBot(token) {
 
                 if (CUSTOMER_BOT_TOKENS[0]) {
                     const tempCustBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
-                    await tempCustBot.sendMessage(order.telegramChatId, `📢 **Regular Order Update**\n🎯 ID: \`${order.targetId}\`\n📌 Status: *${statusMsg}*`, { parse_mode: 'Markdown' }).catch(()=>{});
+                    await tempCustBot.sendMessage(order.telegramChatId, `📢 **Reach Order Update**\n🎯 ID: \`${order.targetId}\`\n📌 Status: *${statusMsg}*`, { parse_mode: 'Markdown' }).catch(()=>{});
                 }
             }
         });
@@ -327,12 +310,6 @@ function startCustomerBot(token, isPrimary) {
     try {
         const bot = new TelegramBot(token, { polling: true });
         bot.on('polling_error', () => {});
-
-        let currentBotUsername = '';
-        bot.getMe().then(info => {
-            currentBotUsername = info.username;
-            if (isPrimary) primaryCustomerBotUsername = currentBotUsername;
-        }).catch(() => {});
 
         bot.on('message', async (msg) => {
             if (!msg || !msg.chat || !msg.text) return;
@@ -443,7 +420,7 @@ app.get('/api/packages', (req, res) => { res.json({ success: true, packages: REC
 app.post('/api/pay', async (req, res) => {
     try {
         const { telegramChatId, amount, coins } = req.body;
-        const serverUrl = "https://cashtree.space";
+        serverPublicUrl = process.env.RENDER_EXTERNAL_URL || `https://cashtree.space`;
         let orderId = `JPW_${Date.now()}_${telegramChatId}`;
 
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
@@ -457,7 +434,7 @@ app.post('/api/pay', async (req, res) => {
             order_amount: parseFloat(amount),
             order_currency: "INR",
             customer_details: { customer_id: String(telegramChatId), customer_phone: "9999999999", customer_email: "test@jpw.com" },
-            order_meta: { return_url: `${serverUrl}/?payment=success&telegramChatId=${telegramChatId}&coins=${coins}&order_id=${orderId}` }
+            order_meta: { return_url: `${serverPublicUrl}/?payment=success&telegramChatId=${telegramChatId}&coins=${coins}&order_id=${orderId}` }
         });
 
         const options = {
