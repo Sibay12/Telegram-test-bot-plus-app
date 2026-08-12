@@ -25,8 +25,9 @@ const MONGO_URI = 'mongodb+srv://sibadityapal47_db_user:G95Dds7IGyBQNmGh@cluster
 const ADMIN_SECRET_PASS = 'jpwadmin123';
 const ADMIN_CHAT_ID = '7659178694';
 
-const INSTAMOJO_API_KEY = '2a3b36b356808da2c7bdfb0baa74cfa9';
-const INSTAMOJO_AUTH_TOKEN = '06473101d417ab781de64a064a25a5a2';
+// 🔑 Cashfree Production Credentials
+const CASHFREE_CLIENT_ID = '132151420cc80e33a29ab5a896e4151231';
+const CASHFREE_CLIENT_SECRET = 'cfsk_ma_prod_07c2ec902f0ab79b31d72c924423b03a_edc81cf8';
 
 // 🤖 Your Customer Bot Tokens
 const CUSTOMER_BOT_TOKENS = [
@@ -584,11 +585,59 @@ function startCustomerBot(token, isPrimary) {
             } else if (data.startsWith('buy_')) {
                 const [, amount, reaches] = data.split('_');
                 bot.answerCallbackQuery(query.id, { text: 'Generating payment link...' });
-                const payUrl = await createInstaPaymentLink(chatId, amount, reaches);
-                if (payUrl) {
-                    bot.sendMessage(chatId, `🔗 **Click below for secure payment:**\n\n[👉 Pay ₹${amount} (For ${reaches} Reaches)](${payUrl})`, { parse_mode: 'Markdown' });
-                } else {
-                    bot.sendMessage(chatId, `❌ Error creating payment link.`);
+                
+                // Call API internally or write direct handler to get Cashfree payment session ID
+                try {
+                    const protocol = 'https';
+                    const serverUrl = serverPublicUrl || `https://${query.message.chat.id}.onrender.com`; // fallback
+                    let orderId = `JPW_${Date.now()}_${chatId}`;
+
+                    const postData = JSON.stringify({
+                        order_id: orderId,
+                        order_amount: parseFloat(amount),
+                        order_currency: "INR",
+                        customer_details: { customer_id: String(chatId), customer_phone: "9999999999", customer_email: "test@jpw.com" },
+                        order_meta: { return_url: `${serverUrl}/?payment=success&telegramChatId=${chatId}&reaches=${reaches}&order_id=${orderId}` }
+                    });
+
+                    const options = {
+                        hostname: 'api.cashfree.com',
+                        path: '/pg/orders',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-client-id': CASHFREE_CLIENT_ID,
+                            'x-client-secret': CASHFREE_CLIENT_SECRET,
+                            'x-api-version': '2022-09-01'
+                        }
+                    };
+
+                    const reqCashfree = https.request(options, (response) => {
+                        let body = '';
+                        response.on('data', chunk => body += chunk);
+                        response.on('end', async () => {
+                            try {
+                                const json = JSON.parse(body);
+                                if (response.statusCode === 200 && json.payment_session_id) {
+                                    // Give checkout link or instruction via Mini App portal
+                                    const portalUrl = serverPublicUrl || "https://cashtree.space";
+                                    await bot.sendMessage(chatId, `💳 **Click below to complete your payment via Cashfree:**\n\n[👉 Pay ₹${amount} (For ${reaches} Reaches)](${portalUrl})`, { parse_mode: 'Markdown' });
+                                } else {
+                                    await bot.sendMessage(chatId, `❌ Payment initialization failed: ${json.message || 'Error'}`);
+                                }
+                            } catch(e) {
+                                await bot.sendMessage(chatId, `❌ Payment link error.`);
+                            }
+                        });
+                    });
+                    reqCashfree.on('error', () => {
+                        bot.sendMessage(chatId, `❌ Network connection error.`);
+                    });
+                    reqCashfree.write(postData);
+                    reqCashfree.end();
+
+                } catch(err) {
+                    bot.sendMessage(chatId, `❌ Error generating Cashfree link.`);
                 }
             }
         });
@@ -908,11 +957,13 @@ app.get('/api/packages', (req, res) => {
     res.json({ success: true, packages: RECHARGE_PACKAGES });
 });
 
+// --- CASHFREE PAYMENT API ---
 app.post('/api/pay', async (req, res) => {
     try {
         const { telegramChatId, amount, reaches } = req.body;
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;
         const serverUrl = `${protocol}://${req.get('host')}`;
+        let orderId = `JPW_${Date.now()}_${telegramChatId}`;
 
         let finalPayAmount = parseFloat(amount);
 
@@ -950,44 +1001,54 @@ app.post('/api/pay', async (req, res) => {
             await user.save();
         }
 
-        const postData = new URLSearchParams({
-            purpose: `Recharge_${reaches}Reaches_${telegramChatId}`,
-            amount: finalPayAmount.toFixed(2),
-            buyer_name: 'Customer',
-            send_email: 'False',
-            send_sms: 'False',
-            redirect_url: `${serverUrl}/?payment=success&telegramChatId=${telegramChatId}&reaches=${reaches}`,
-            webhook: `${serverUrl}/instamojo-webhook`
-        }).toString();
+        const postData = JSON.stringify({
+            order_id: orderId,
+            order_amount: finalPayAmount,
+            order_currency: "INR",
+            customer_details: {
+                customer_id: String(telegramChatId),
+                customer_phone: "9999999999",
+                customer_email: "test@jpw.com"
+            },
+            order_meta: {
+                return_url: `${serverUrl}/?payment=success&telegramChatId=${telegramChatId}&reaches=${reaches}&order_id=${orderId}`
+            }
+        });
 
         const options = {
-            hostname: 'www.instamojo.com',
-            path: '/api/1.1/payment-requests/',
+            hostname: 'api.cashfree.com',
+            path: '/pg/orders',
             method: 'POST',
             headers: {
-                'X-Api-Key': INSTAMOJO_API_KEY,
-                'X-Auth-Token': INSTAMOJO_AUTH_TOKEN,
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Content-Length': Buffer.byteLength(postData)
+                'Content-Type': 'application/json',
+                'x-client-id': CASHFREE_CLIENT_ID,
+                'x-client-secret': CASHFREE_CLIENT_SECRET,
+                'x-api-version': '2022-09-01'
             }
         };
 
-        const reqInsta = https.request(options, (response) => {
+        const reqCashfree = https.request(options, (response) => {
             let body = '';
             response.on('data', chunk => body += chunk);
             response.on('end', () => {
                 try {
                     const json = JSON.parse(body);
-                    if (response.statusCode === 201 && json.success) {
-                        res.json({ success: true, paymentUrl: json.payment_request.longurl });
+                    if (response.statusCode === 200 && json.payment_session_id) {
+                        res.json({ success: true, paymentSessionId: json.payment_session_id, orderId, environment: 'PRODUCTION' });
                     } else {
-                        res.json({ success: false, message: json.message || 'Payment failed' });
+                        res.json({ success: false, message: json.message || 'Cashfree Authorization Failed' });
                     }
-                } catch(e) { res.status(500).json({ success: false, message: 'JSON Parse Error' }); }
+                } catch(e) { 
+                    res.status(500).json({ success: false, message: 'JSON Parse Error' }); 
+                }
             });
         });
-        reqInsta.write(postData);
-        reqInsta.end();
+        reqCashfree.on('error', (err) => { 
+            res.status(500).json({ success: false, message: 'Network Error: ' + err.message }); 
+        });
+        reqCashfree.write(postData);
+        reqCashfree.end();
+
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -995,17 +1056,23 @@ app.post('/api/pay', async (req, res) => {
 
 app.post('/api/verify-instant', async (req, res) => {
     try {
-        const { telegramChatId, reaches } = req.body;
+        const { telegramChatId, reaches, order_id } = req.body;
+        const transactionId = order_id || `INSTANT_${Date.now()}_${telegramChatId}`;
+        const existingUtr = await UsedUtrModel.findOne({ utrId: transactionId });
+        if (existingUtr) return res.json({ success: false, message: 'Already credited!' });
+
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
         if (user) {
+            await UsedUtrModel.create({ utrId: transactionId });
             user.reaches += parseFloat(reaches);
             await user.save();
+            await notifyCustomerOnly(null, user, `💳 **Payment Successful!** 🎉✨\n\n✨ Added: \`+${reaches} Reaches\` 🚀\n💰 **New Total Balance:** \`${user.reaches.toFixed(4)} Reaches\` 💎\n\n*(JPW REACHED SERVICES BOT)*`);
             res.json({ success: true, user });
-        } else {
-            res.json({ success: false, message: 'User not found' });
+        } else { 
+            res.json({ success: false, message: 'User not found' }); 
         }
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+    } catch (err) { 
+        res.status(500).json({ success: false, error: err.message }); 
     }
 });
 
@@ -1111,36 +1178,6 @@ app.post('/api/admin/delete-user', async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
-});
-
-app.post('/instamojo-webhook', async (req, res) => {
-    try {
-        const paymentData = req.body;
-        const status = paymentData.status;
-        const purpose = paymentData.purpose || '';
-        const paymentId = paymentData.payment_id;
-
-        res.status(200).send('Webhook Received');
-
-        if ((status === 'Credit' || status === 'Completed') && purpose.includes('Recharge_')) {
-            const parts = purpose.split('_');
-            if (parts.length >= 3) {
-                const reachesToAdd = parseFloat(parts[1]);
-                const telegramChatId = parts[2];
-
-                const existingUtrDoc = await UsedUtrModel.findOne({ utrId: paymentId });
-                if (!existingUtrDoc && !isNaN(reachesToAdd)) {
-                    await UsedUtrModel.create({ utrId: paymentId });
-                    let user = await UserModel.findOne({ telegramChatId });
-                    if (user) {
-                        user.reaches += reachesToAdd;
-                        await user.save();
-                        await notifyCustomerOnly(null, user, `💳 **Payment Successful!** 🎉✨\n\n✨ Added: \`+${reachesToAdd} Reaches\` 🚀\n💰 **New Total Balance:** \`${user.reaches.toFixed(4)} Reaches\` 💎\n\n*(JPW REACHED SERVICES BOT)*`);
-                    }
-                }
-            }
-        }
-    } catch (err) {}
 });
 
 const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
