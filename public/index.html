@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPW ENGINEER PORTAL - Reach & SR Services</title>
+    <title>JPW Engineer Portal - Reach & SR Services</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <style>
@@ -47,19 +47,14 @@
         .hidden { display: none !important; }
         .user-box { background: rgba(30, 41, 59, 0.7); padding: 20px; border-radius: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 20px; }
         .bonus-btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; box-shadow: 0 6px 20px rgba(245,158,11,0.3); }
-        .convert-btn { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; box-shadow: 0 6px 20px rgba(139,92,246,0.3); }
         .transfer-btn { background: linear-gradient(135deg, #06b6d4, #0891b2); color: #fff; box-shadow: 0 6px 20px rgba(6,182,212,0.3); }
 
         .marketing-banner {
             background: linear-gradient(135deg, #db2777, #7c3aed, #2563eb);
             background-size: 200% 200%;
             animation: gradientAnim 5s ease infinite;
-            padding: 16px;
-            border-radius: 18px;
-            text-align: center;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(219,39,119,0.4);
-            border: 1px solid rgba(255,255,255,0.3);
+            padding: 16px; border-radius: 18px; text-align: center; margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(219,39,119,0.4); border: 1px solid rgba(255,255,255,0.3);
         }
         @keyframes gradientAnim {
             0% { background-position: 0% 50%; }
@@ -116,15 +111,13 @@
         <div class="user-box">
             <p style="margin: 6px 0;">👨‍🔧 <b>Engineer:</b> <span id="userName" style="color: #38bdf8;"></span></p>
             <p style="margin: 6px 0;">💬 <b>Telegram ID:</b> <span id="dispChatId" style="font-size: 13px; color: #94a3b8;"></span></p>
-            <p style="margin: 10px 0 6px 0;">🪙 <b>JPW Coins:</b> <span id="userCoins" class="badge">0</span> Coins</p>
-            <p style="margin: 6px 0; font-size: 13px; color: #94a3b8;">💎 <b>Reaches:</b> <span id="userReaches">0</span></p>
+            <p style="margin: 10px 0 6px 0;">🪙 <b>JPW Coins Balance:</b> <span id="userCoins" class="badge">0</span> Coins</p>
             
-            <div style="display: flex; gap: 8px; margin-top: 12px;">
-                <button onclick="claimDailyBonus()" class="bonus-btn" style="margin:0; font-size: 13px; padding: 10px;">🎁 Bonus</button>
-                <button onclick="convertCoins()" class="convert-btn" style="margin:0; font-size: 13px; padding: 10px;">🔄 Convert</button>
-                <button onclick="openTransferModal()" class="transfer-btn" style="margin:0; font-size: 13px; padding: 10px;">🤝 Share</button>
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+                <button onclick="claimDailyBonus()" class="bonus-btn" style="margin:0; font-size: 13px; padding: 10px; flex: 1;">🎁 Daily Bonus</button>
+                <button onclick="openTransferModal()" class="transfer-btn" style="margin:0; font-size: 13px; padding: 10px; flex: 1;">🤝 Share Coins</button>
             </div>
-            <button onclick="logout()" style="background: #ef4444; color: #fff; width:auto; padding:8px 20px; margin-top:12px; font-size:13px; box-shadow: none;">🚪 Logout</button>
+            <button onclick="logout()" style="background: #ef4444; color: #fff; width:auto; padding:8px 20px; margin-top:14px; font-size:13px; box-shadow: none;">🚪 Logout</button>
         </div>
 
         <!-- Coin Transfer Form Modal -->
@@ -145,6 +138,7 @@
         <!-- Regular Reach Order Form -->
         <div id="formRegular">
             <h3 style="color: #38bdf8; font-size: 16px; margin-bottom: 10px;">⚡ Submit Regular Reach Order</h3>
+            <p style="font-size: 12px; color: #94a3b8; margin: 0 0 10px 0;">Cost: <b>1 JPW Coin</b> per order.</p>
             <input type="text" id="targetId" placeholder="Target Username / ID">
             <input type="password" id="targetPass" placeholder="Target Password">
             <button onclick="submitOrder()">🚀 Submit Reach Order (1 Coin)</button>
@@ -295,7 +289,6 @@
                 document.getElementById('userName').innerText = data.user.name;
                 document.getElementById('dispChatId').innerText = data.user.telegramChatId;
                 document.getElementById('userCoins').innerText = data.user.jpwCoins.toFixed(2);
-                document.getElementById('userReaches').innerText = (data.user.reaches || 0).toFixed(4);
                 setupReferralLink(data.user.telegramChatId);
                 loadPackages();
             } else {
@@ -326,7 +319,6 @@
                 document.getElementById('userName').innerText = data.user.name;
                 document.getElementById('dispChatId').innerText = data.user.telegramChatId;
                 document.getElementById('userCoins').innerText = data.user.jpwCoins.toFixed(2);
-                document.getElementById('userReaches').innerText = (data.user.reaches || 0).toFixed(4);
                 setupReferralLink(data.user.telegramChatId);
                 loadPackages();
             } else {
@@ -380,28 +372,6 @@
                 toggleTransferBox();
             } else {
                 alert(data.message || 'Transfer failed');
-            }
-        } catch(e) {
-            alert('Network Error!');
-        }
-    }
-
-    async function convertCoins() {
-        const amt = prompt("Enter how many JPW Coins you want to convert to Reaches:");
-        if(!amt) return;
-        try {
-            const res = await fetch('/api/convert-coins', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ telegramChatId, amount: amt })
-            });
-            const data = await res.json();
-            if(data.success) {
-                alert(`✅ Successfully converted ${amt} Coins to Reaches!`);
-                document.getElementById('userCoins').innerText = data.user.jpwCoins.toFixed(2);
-                document.getElementById('userReaches').innerText = (data.user.reaches || 0).toFixed(4);
-            } else {
-                alert(data.message || 'Conversion failed');
             }
         } catch(e) {
             alert('Network Error!');
