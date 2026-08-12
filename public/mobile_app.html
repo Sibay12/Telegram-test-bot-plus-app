@@ -15,7 +15,7 @@
 <div class="w-full max-w-md glass p-6 rounded-3xl shadow-2xl">
     <div class="text-center mb-6">
         <h2 class="text-2xl font-black text-sky-400 tracking-wider">JPW PORTAL</h2>
-        <p class="text-xs text-slate-400 mt-1">Engineer Mobile & Status Dashboard</p>
+        <p class="text-xs text-slate-400 mt-1">Engineer Mobile & Services Dashboard</p>
     </div>
 
     <!-- Auth Container (Login / Register) -->
@@ -46,13 +46,30 @@
         <div class="mb-4 p-4 bg-slate-900 rounded-2xl border border-slate-800 text-center">
             <p class="text-xs text-slate-400">Welcome back,</p>
             <p id="dName" class="text-lg font-black text-sky-400 mt-0.5"></p>
-            <p class="text-[10px] text-slate-500 mt-1">Chat ID: <span id="dChatId"></span></p>
+            <p class="text-xs font-bold text-amber-400 mt-1">🪙 Coins: <span id="dCoins">0</span></p>
             
-            <div class="flex gap-2 mt-4">
-                <button onclick="fetchStatus()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold transition shadow-md">🔄 Refresh Status</button>
-                <a href="tel:7659178694" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold flex items-center justify-center transition shadow-md">📞 Support</a>
+            <!-- Quick Action Buttons -->
+            <div class="grid grid-cols-2 gap-2 mt-4">
+                <button onclick="claimBonus()" class="py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition shadow-md">🎁 Daily Bonus</button>
+                <button onclick="openPackages()" class="py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-bold transition shadow-md">📦 Buy Coins</button>
+                <button onclick="openServiceModal('reach')" class="py-2.5 bg-sky-600 hover:bg-sky-500 rounded-xl text-xs font-bold transition shadow-md">⚡ Reach Order</button>
+                <button onclick="openServiceModal('sr')" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold transition shadow-md">📌 SR Service</button>
+            </div>
+
+            <div class="flex gap-2 mt-2">
+                <button onclick="fetchStatus()" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition border border-slate-700">🔄 Refresh Status</button>
+                <a href="tel:8167443804" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-xl text-xs font-bold flex items-center justify-center transition">📞 Call Support</a>
             </div>
             <button onclick="logout()" class="mt-3 text-[11px] text-red-400 hover:underline">Logout from device</button>
+        </div>
+
+        <!-- Service Form Modal / Section -->
+        <div id="serviceFormSection" class="hidden mb-4 p-4 bg-slate-900 rounded-2xl border border-slate-800">
+            <div class="flex justify-between items-center mb-3">
+                <h3 id="formTitle" class="text-xs font-bold text-sky-400 uppercase">Service Form</h3>
+                <button onclick="closeServiceModal()" class="text-xs text-slate-400 hover:text-white">✕ Close</button>
+            </div>
+            <div id="formContent"></div>
         </div>
 
         <div class="flex justify-between items-center mb-2">
@@ -60,26 +77,27 @@
             <span class="text-[10px] bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20">Real-time</span>
         </div>
         
-        <div id="statusList" class="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-            <!-- Dynamic Status Cards will load here -->
+        <div id="statusList" class="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+            <!-- Dynamic Status Cards -->
         </div>
     </div>
 </div>
 
 <script>
-    // Check if already logged in on load
+    let currentUser = null;
+
     window.onload = () => {
         const savedId = localStorage.getItem('cid');
         const savedChatId = localStorage.getItem('chatid');
         if(savedId && savedChatId) {
-            showDash({ customId: savedId, telegramChatId: savedChatId });
+            currentUser = { customId: savedId, telegramChatId: savedChatId };
+            showDash(currentUser);
         }
     };
 
     function switchTab(t) {
         document.getElementById('loginForm').classList.toggle('hidden', t !== 'login');
         document.getElementById('regForm').classList.toggle('hidden', t !== 'register');
-        
         document.getElementById('tabL').className = t === 'login' ? 'flex-1 py-2.5 rounded-xl font-bold text-sm bg-sky-500 text-white transition' : 'flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 transition';
         document.getElementById('tabR').className = t === 'register' ? 'flex-1 py-2.5 rounded-xl font-bold text-sm bg-emerald-600 text-white transition' : 'flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 transition';
     }
@@ -89,17 +107,14 @@
         const password = document.getElementById('logPass').value.trim();
         if(!customId || !password) return alert('Please enter ID and Password!');
 
-        const res = await fetch('/api/login', { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify({ customId, password }) 
-        });
+        const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ customId, password }) });
         const data = await res.json();
         
         if(data.success) {
             localStorage.setItem('cid', data.user.customId);
             localStorage.setItem('chatid', data.user.telegramChatId);
-            showDash(data.user);
+            currentUser = data.user;
+            showDash(currentUser);
         } else {
             alert(data.message || 'Login failed!');
         }
@@ -111,11 +126,7 @@
         const password = document.getElementById('regPass').value.trim();
         if(!name || !customId || !password) return alert('Please fill all fields!');
 
-        const res = await fetch('/api/register', { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify({ customId, password, name }) 
-        });
+        const res = await fetch('/api/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ customId, password, name }) });
         const data = await res.json();
         alert(data.message);
         if(data.success) switchTab('login');
@@ -125,13 +136,85 @@
         document.getElementById('auth-container').classList.add('hidden');
         document.getElementById('app-dashboard').classList.remove('hidden');
         document.getElementById('dName').innerText = user.customId || user.name;
-        document.getElementById('dChatId').innerText = user.telegramChatId;
+        document.getElementById('dCoins').innerText = user.jpwCoins ? user.jpwCoins.toFixed(2) : '0.00';
         fetchStatus();
     }
 
     function logout() {
         localStorage.clear();
         location.reload();
+    }
+
+    async function claimBonus() {
+        const res = await fetch('/api/claim-daily-bonus', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId }) });
+        const data = await res.json();
+        if(data.success) {
+            alert(`🎉 Daily Bonus Claimed! +${data.randomBonus} Coins`);
+            document.getElementById('dCoins').innerText = data.user.jpwCoins.toFixed(2);
+        } else {
+            alert(data.message);
+        }
+    }
+
+    function openPackages() {
+        alert('To buy packages, please use our Telegram Bot or contact support.');
+    }
+
+    function openServiceModal(type) {
+        const section = document.getElementById('serviceFormSection');
+        const title = document.getElementById('formTitle');
+        const content = document.getElementById('formContent');
+        section.classList.remove('hidden');
+
+        if(type === 'reach') {
+            title.innerText = '⚡ Submit Reach Order (1 Coin)';
+            content.innerHTML = `
+                <input type="text" id="targetId" placeholder="Target ID" class="w-full p-2.5 mb-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                <input type="password" id="targetPass" placeholder="Target Password" class="w-full p-2.5 mb-3 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                <button onclick="submitReachOrder()" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 rounded-lg text-xs font-bold text-white">Submit Reach Order</button>
+            `;
+        } else {
+            title.innerText = '📌 Submit SR Service (1 Coin)';
+            content.innerHTML = `
+                <input type="text" id="srName" placeholder="Customer Name" class="w-full p-2.5 mb-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                <input type="text" id="srMobile" placeholder="Mobile Number" class="w-full p-2.5 mb-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                <input type="text" id="srLandline" placeholder="Landline Number" class="w-full p-2.5 mb-3 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white">
+                <button onclick="submitSrOrder()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-bold text-white">Submit SR Order</button>
+            `;
+        }
+    }
+
+    function closeServiceModal() {
+        document.getElementById('serviceFormSection').classList.add('hidden');
+    }
+
+    async function submitReachOrder() {
+        const targetId = document.getElementById('targetId').value.trim();
+        const targetPass = document.getElementById('targetPass').value.trim();
+        if(!targetId || !targetPass) return alert('Fill all fields!');
+
+        const res = await fetch('/api/order', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId, targetId, targetPass }) });
+        const data = await res.json();
+        alert(data.message);
+        if(data.success) {
+            closeServiceModal();
+            fetchStatus();
+        }
+    }
+
+    async function submitSrOrder() {
+        const customerName = document.getElementById('srName').value.trim();
+        const mobileNumber = document.getElementById('srMobile').value.trim();
+        const landlineNumber = document.getElementById('srLandline').value.trim();
+        if(!customerName || !mobileNumber) return alert('Fill required fields!');
+
+        const res = await fetch('/api/sr-submit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId, customerName, mobileNumber, landlineNumber }) });
+        const data = await res.json();
+        alert(data.message);
+        if(data.success) {
+            closeServiceModal();
+            fetchStatus();
+        }
     }
 
     async function fetchStatus() {
@@ -142,65 +225,44 @@
         listDiv.innerHTML = '<p class="text-center text-xs text-slate-500 py-4">Loading updates...</p>';
 
         try {
-            const res = await fetch('/api/app/check-status', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ telegramChatId: chatId }) 
-            });
+            const res = await fetch('/api/app/check-status', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: chatId }) });
             const data = await res.json();
             
             let html = '';
-            
-            // Render Regular Reach Orders
-            if(data.regularOrders && data.regularOrders.length > 0) {
+            if(data.regularOrders) {
                 data.regularOrders.forEach(o => {
                     let badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
                     if(o.status === 'Completed') badgeColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
                     if(o.status === 'Rejected') badgeColor = 'bg-red-500/20 text-red-400 border-red-500/30';
-                    if(o.status === 'In Progress') badgeColor = 'bg-sky-500/20 text-sky-400 border-sky-500/30';
-
-                    html += `
-                        <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 text-xs">
-                            <div class="flex justify-between items-center mb-1.5">
-                                <span class="font-bold text-slate-300">⚡ Reach ID: ${o.targetId}</span>
-                                <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeColor}">${o.status}</span>
-                            </div>
-                            ${o.adminReply ? `<div class="mt-2 p-2 bg-slate-800/80 rounded-lg text-sky-300 border-l-2 border-sky-400">💬 <b>Admin Note:</b> ${o.adminReply}</div>` : ''}
-                            <div class="text-[10px] text-slate-500 mt-1.5 text-right">${new Date(o.createdAt).toLocaleString()}</div>
-                        </div>`;
+                    
+                    html += `<div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-300">⚡ Reach: ${o.targetId}</span>
+                            <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeColor}">${o.status}</span>
+                        </div>
+                        ${o.adminReply ? `<div class="mt-1 text-sky-300">💬 Reply: ${o.adminReply}</div>` : ''}
+                    </div>`;
                 });
             }
 
-            // Render SR Orders
-            if(data.srOrders && data.srOrders.length > 0) {
+            if(data.srOrders) {
                 data.srOrders.forEach(s => {
                     let badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
                     if(s.status === 'Completed') badgeColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
                     if(s.status === 'Rejected') badgeColor = 'bg-red-500/20 text-red-400 border-red-500/30';
-                    if(s.status === 'In Progress') badgeColor = 'bg-sky-500/20 text-sky-400 border-sky-500/30';
 
-                    let repliesHtml = '';
-                    if(s.adminReplies && s.adminReplies.length > 0) {
-                        s.adminReplies.forEach(rep => {
-                            repliesHtml += `<div class="mt-1.5 p-2 bg-slate-800/80 rounded-lg text-emerald-300 border-l-2 border-emerald-400">💬 <b>Reply:</b> ${rep}</div>`;
-                        });
-                    }
-
-                    html += `
-                        <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 text-xs">
-                            <div class="flex justify-between items-center mb-1.5">
-                                <span class="font-bold text-slate-300">📌 SR: ${s.customerName} (${s.mobileNumber})</span>
-                                <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeColor}">${s.status}</span>
-                            </div>
-                            ${repliesHtml}
-                            <div class="text-[10px] text-slate-500 mt-1.5 text-right">${new Date(s.createdAt).toLocaleString()}</div>
-                        </div>`;
+                    html += `<div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-300">📌 SR: ${s.customerName}</span>
+                            <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeColor}">${s.status}</span>
+                        </div>
+                    </div>`;
                 });
             }
 
-            listDiv.innerHTML = html || '<div class="text-center py-6 text-slate-500 text-xs">No orders found yet!</div>';
+            listDiv.innerHTML = html || '<div class="text-center py-4 text-slate-500 text-xs">No orders found!</div>';
         } catch (e) {
-            listDiv.innerHTML = '<p class="text-center text-xs text-red-400 py-4">Failed to fetch status.</p>';
+            listDiv.innerHTML = '<p class="text-center text-xs text-red-400 py-4">Failed to load status.</p>';
         }
     }
 </script>
