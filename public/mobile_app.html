@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPW Cyber-Tech Portal v3.4</title>
+    <title>JPW Cyber-Tech Portal v3.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <style>
@@ -95,7 +95,7 @@
             </div>
 
             <div class="flex gap-2 mt-3">
-                <a href="https://chat.whatsapp.com/YOUR_WHATSAPP_GROUP_LINK_HERE" target="_blank" class="w-full py-2 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center justify-center transition">💬 JOIN WHATSAPP GROUP</a>
+                <a href="https://chat.whatsapp.com/DEWvYKtdJAaAlHghem3puj?s=cl&p=a&ilr=4" target="_blank" class="w-full py-2 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center justify-center transition">💬 JOIN WHATSAPP GROUP</a>
             </div>
             <button onclick="logout()" class="mt-2 text-[10px] text-red-400 hover:underline uppercase tracking-wider">Disconnect Session</button>
         </div>
@@ -166,7 +166,7 @@
     let currentUser = null;
     const cashfree = Cashfree({ mode: "production" });
 
-    window.onload = () => {
+    window.onload = async () => {
         const urlParams = new URLSearchParams(window.location.search);
         const paymentStatus = urlParams.get('payment');
         const tgId = urlParams.get('telegramChatId');
@@ -174,14 +174,21 @@
         const orderId = urlParams.get('order_id');
 
         if(paymentStatus === 'success' && tgId && coinsToAdd) {
-            verifyInstantPayment(tgId, coinsToAdd, orderId);
+            await verifyInstantPayment(tgId, coinsToAdd, orderId);
         }
 
         const savedId = localStorage.getItem('cid');
-        const savedChatId = localStorage.getItem('chatid');
-        if(savedId && savedChatId) {
-            currentUser = { customId: savedId, telegramChatId: savedChatId };
-            showDash(currentUser);
+        const savedPass = localStorage.getItem('cpass');
+        if(savedId && savedPass) {
+            // Auto login and fetch real coin balance from database
+            try {
+                const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ customId: savedId, password: savedPass }) });
+                const data = await res.json();
+                if(data.success) {
+                    currentUser = data.user;
+                    showDash(currentUser);
+                }
+            } catch(e) {}
         }
     };
 
@@ -240,6 +247,7 @@
         
         if(data.success) {
             localStorage.setItem('cid', data.user.customId);
+            localStorage.setItem('cpass', password);
             localStorage.setItem('chatid', data.user.telegramChatId);
             currentUser = data.user;
             showDash(currentUser);
@@ -265,7 +273,7 @@
         document.getElementById('auth-container').classList.add('hidden');
         document.getElementById('app-dashboard').classList.remove('hidden');
         document.getElementById('dName').innerText = user.customId || user.name;
-        document.getElementById('dCoins').innerText = user.jpwCoins ? user.jpwCoins.toFixed(2) : '0.00';
+        document.getElementById('dCoins').innerText = user.jpwCoins !== undefined ? user.jpwCoins.toFixed(2) : '0.00';
     }
 
     function logout() {
