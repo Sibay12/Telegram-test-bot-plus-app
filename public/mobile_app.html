@@ -176,11 +176,10 @@
 
 <script>
     let currentUser = null;
-    let previousStatuses = {}; // Track previous statuses for push notification comparison
+    let previousStatuses = {};
     const cashfree = Cashfree({ mode: "production" });
 
     window.onload = async () => {
-        // Request browser notification permissions on load
         if ("Notification" in window && Notification.permission !== "granted") {
             Notification.requestPermission();
         }
@@ -209,10 +208,8 @@
         }
     };
 
-    // 🕒 Check time and show notice modal if after 10 PM or before 9 AM
     function checkWorkingHoursNotice() {
         const currentHour = new Date().getHours();
-        // If time is >= 22 (10 PM) or < 9 (9 AM)
         if (currentHour >= 22 || currentHour < 9) {
             document.getElementById('timeNoticeModal').classList.remove('hidden');
         }
@@ -222,7 +219,6 @@
         document.getElementById('timeNoticeModal').classList.add('hidden');
     }
 
-    // 🔔 Browser Notification trigger
     function showBrowserNotification(title, body) {
         if ("Notification" in window && Notification.permission === "granted") {
             new Notification(title, { body: body });
@@ -235,7 +231,15 @@
             const data = await res.json();
             if(data.success) {
                 alert(`🎉 Payment Successful! Added ${coins} JPW Coins to your account.`);
-                window.location.href = "/app"; // Smart redirect back to /app cleanly
+                
+                // ✅ CRITICAL BUG FIX: Clean URL parameters immediately via history API without reloading
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+
+                if(currentUser) {
+                    currentUser.jpwCoins = data.user.jpwCoins;
+                    document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
+                }
             }
         } catch(e) {}
     }
@@ -312,7 +316,6 @@
         document.getElementById('dName').innerText = user.customId || user.name;
         document.getElementById('dCoins').innerText = user.jpwCoins !== undefined ? user.jpwCoins.toFixed(2) : '0.00';
         
-        // Trigger working hours notice on login
         checkWorkingHoursNotice();
     }
 
@@ -398,7 +401,6 @@
             let html = '';
             if(data.regularOrders) {
                 data.regularOrders.forEach(o => {
-                    // Check for status change and send browser notification
                     if (previousStatuses[o._id] && previousStatuses[o._id] !== o.status) {
                         showBrowserNotification("JPW Order Update", `Reach ID ${o.targetId} status changed to: ${o.status}`);
                     }
