@@ -61,7 +61,10 @@
             <h1 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-300 uppercase tracking-widest">⚡ JPW COMMAND CENTER // JARVIS</h1>
             <p class="text-[10px] text-slate-400">Manage System Nodes, Users, and Complete Database Backups.</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+            <button onclick="downloadIdPassBackup()" class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-extrabold rounded-xl text-xs transition flex items-center gap-2 shadow-lg shadow-cyan-900/30">
+                🔑 DOWNLOAD ID-PASS (.TXT)
+            </button>
             <button onclick="downloadDatabaseBackup()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold rounded-xl text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-900/30">
                 📥 DOWNLOAD DB BACKUP
             </button>
@@ -335,6 +338,11 @@
             document.getElementById('clearPin').value = '';
             loadAdminData();
         }
+    }
+
+    // 🔑 Download All ID-Pass Backup Text File
+    function downloadIdPassBackup() {
+        window.location.href = '/api/admin/download-idpass';
     }
 
     // 📥 Complete Database Backup Export Function (JSON File Download)
