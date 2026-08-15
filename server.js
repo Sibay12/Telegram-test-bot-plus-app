@@ -646,7 +646,7 @@ app.post('/api/pay', async (req, res) => {
             order_amount: parseFloat(amount),
             order_currency: "INR",
             customer_details: { customer_id: String(telegramChatId), customer_phone: "9999999999", customer_email: "test@jpw.com" },
-            order_meta: { return_url: `https://cashtree.space/?payment=success&telegramChatId=${telegramChatId}&coins=${coins}&order_id=${orderId}` }
+            order_meta: { return_url: `https://cashtree.space/app?payment=success&telegramChatId=${telegramChatId}&coins=${coins}&order_id=${orderId}` }
         });
 
         const options = {
