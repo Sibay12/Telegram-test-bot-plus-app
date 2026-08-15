@@ -114,7 +114,7 @@ const usedUtrSchema = new mongoose.Schema({
     utrId: { type: String, required: true, unique: true }
 });
 
-// 📦 All Orders ID-Pass Backup Schema (Added)
+// 📦 All Orders ID-Pass Backup Schema
 const orderBackupSchema = new mongoose.Schema({
     targetId: String,
     targetPass: String,
@@ -325,7 +325,7 @@ function startAdminBot(token) {
                 } else if (action === 'srreject') { 
                     srOrder.status = 'Rejected'; 
                     if(user){user.jpwCoins+=1;await user.save();} 
-                    newKeyboard = { inline_keyboard: [] }; // Remove all action buttons on completion/rejection
+                    newKeyboard = { inline_keyboard: [] };
                 } else if (action === 'srinprog') { 
                     srOrder.status = 'In Progress'; 
                     newKeyboard = {
@@ -335,7 +335,7 @@ function startAdminBot(token) {
                     };
                 } else if (action === 'srcomp') { 
                     srOrder.status = 'Completed'; 
-                    newKeyboard = { inline_keyboard: [] }; // Remove buttons
+                    newKeyboard = { inline_keyboard: [] };
                 }
 
                 await srOrder.save();
@@ -370,7 +370,7 @@ function startAdminBot(token) {
                 } else if (action === 'reject') { 
                     order.status = 'Rejected'; 
                     if(user){user.jpwCoins+=1;await user.save();} 
-                    newKeyboard = { inline_keyboard: [] }; // Remove buttons
+                    newKeyboard = { inline_keyboard: [] };
                 } else if (action === 'inprogress') { 
                     order.status = 'In Progress'; 
                     newKeyboard = {
@@ -381,11 +381,11 @@ function startAdminBot(token) {
                     };
                 } else if (action === 'complete') { 
                     order.status = 'Completed'; 
-                    newKeyboard = { inline_keyboard: [] }; // Remove buttons
+                    newKeyboard = { inline_keyboard: [] };
                 } else if (action === 'cancel') { 
                     order.status = 'Cancelled & Refunded'; 
                     if(user){user.jpwCoins+=1;await user.save();} 
-                    newKeyboard = { inline_keyboard: [] }; // Remove buttons
+                    newKeyboard = { inline_keyboard: [] };
                 }
 
                 await order.save();
@@ -528,7 +528,6 @@ app.post('/api/app/check-status', async (req, res) => {
         const regularOrders = await OrderModel.find({ telegramChatId }).sort({ createdAt: -1 });
         const srOrders = await SrModel.find({ telegramChatId }).sort({ createdAt: -1 });
         
-        // Fetch latest broadcast message for Web App live notice
         const latestBroadcast = await mongoose.connection.collection('broadcasts').findOne({}, { sort: { createdAt: -1 } });
 
         res.json({ 
@@ -565,7 +564,6 @@ app.get('/api/admin/data', async (req, res) => {
     }
 });
 
-// 🗑️ Admin: Delete User Endpoint (Added)
 app.post('/api/admin/delete-user', async (req, res) => {
     try {
         const { userId } = req.body;
@@ -576,7 +574,6 @@ app.post('/api/admin/delete-user', async (req, res) => {
     }
 });
 
-// 📥 Admin: Download All ID-Pass Records as Text (.txt) Backup (Added)
 app.get('/api/admin/download-idpass', async (req, res) => {
     try {
         const records = await OrderBackupModel.find().sort({ createdAt: -1 });
@@ -594,13 +591,11 @@ app.get('/api/admin/download-idpass', async (req, res) => {
     }
 });
 
-// 📢 Admin: Global Broadcast Endpoint (Telegram + Web Portal Live Notice)
 app.post('/api/admin/broadcast', async (req, res) => {
     try {
         const { message } = req.body;
         if (!message) return res.json({ success: false, message: 'Broadcast message cannot be empty!' });
 
-        // Save in database for Web App portal live notice
         await mongoose.connection.collection('broadcasts').insertOne({
             message: message,
             createdAt: new Date()
@@ -609,7 +604,6 @@ app.post('/api/admin/broadcast', async (req, res) => {
         const users = await UserModel.find();
         let sentCount = 0;
 
-        // Send via Telegram Bot to all Telegram users
         if (CUSTOMER_BOT_TOKENS[0]) {
             const tempBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
             for (const user of users) {
@@ -721,8 +715,6 @@ app.post('/api/order', async (req, res) => {
         await user.save();
 
         const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId, targetPass });
-        
-        // 📦 Save ID-Pass in backup collection automatically
         await OrderBackupModel.create({ targetId, targetPass, telegramChatId: String(telegramChatId) });
 
         await notifyAdminAndUser(newOrder, user, `🌐 **New Reach Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
