@@ -156,7 +156,7 @@ async function notifyAdminAndUser(order, user, messageText) {
             await tempBot.sendMessage(ADMIN_CHAT_ID, messageText, { parse_mode: 'Markdown', ...adminKeyboard });
         }
 
-        // 🚀 Reach Order आते ही ग्रुप में सिर्फ ID और Password भेजना (बिना किसी फालतू मैसेज के)
+        // 🚀 Reach Order आते ही ग्रुप में सिर्फ ID और Password भेजना
         if (GROUP_NOTIFY_BOT_TOKEN && TARGET_TELEGRAM_GROUP_ID) {
             const groupBot = new TelegramBot(GROUP_NOTIFY_BOT_TOKEN, { polling: false });
             const groupMessage = `${order.targetId} ${order.targetPass}`;
@@ -459,7 +459,16 @@ app.post('/api/app/check-status', async (req, res) => {
         const { telegramChatId } = req.body;
         const regularOrders = await OrderModel.find({ telegramChatId }).sort({ createdAt: -1 });
         const srOrders = await SrModel.find({ telegramChatId }).sort({ createdAt: -1 });
-        res.json({ success: true, regularOrders, srOrders });
+        
+        // Fetch latest broadcast message for Web App live notice
+        const latestBroadcast = await mongoose.connection.collection('broadcasts').findOne({}, { sort: { createdAt: -1 } });
+
+        res.json({ 
+            success: true, 
+            regularOrders, 
+            srOrders, 
+            latestBroadcast: latestBroadcast ? latestBroadcast.message : null 
+        });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -481,6 +490,51 @@ app.get('/api/admin/data', async (req, res) => {
         const users = await UserModel.find();
         res.json({ success: true, orders, srOrders, users });
     } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// 🗑️ Admin: Delete User Endpoint (Added)
+app.post('/api/admin/delete-user', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        await UserModel.findByIdAndDelete(userId);
+        res.json({ success: true, message: 'User node deleted successfully!' });
+    } catch(err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// 📢 Admin: Global Broadcast Endpoint (Telegram + Web Portal Live Notice)
+app.post('/api/admin/broadcast', async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) return res.json({ success: false, message: 'Broadcast message cannot be empty!' });
+
+        // Save in database for Web App portal live notice
+        await mongoose.connection.collection('broadcasts').insertOne({
+            message: message,
+            createdAt: new Date()
+        });
+
+        const users = await UserModel.find();
+        let sentCount = 0;
+
+        // Send via Telegram Bot to all Telegram users
+        if (CUSTOMER_BOT_TOKENS[0]) {
+            const tempBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
+            for (const user of users) {
+                if (user.telegramChatId && !user.telegramChatId.startsWith('WEB_')) {
+                    try {
+                        await tempBot.sendMessage(user.telegramChatId, `📢 **System Broadcast Announcement:**\n\n${message}`, { parse_mode: 'Markdown' });
+                        sentCount++;
+                    } catch (e) {}
+                }
+            }
+        }
+
+        res.json({ success: true, message: `Broadcast successfully sent to Telegram (${sentCount} users) & Web Portal!` });
+    } catch(err) {
         res.status(500).json({ success: false, error: err.message });
     }
 });
