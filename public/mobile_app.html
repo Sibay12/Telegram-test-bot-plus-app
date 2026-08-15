@@ -27,6 +27,18 @@
 </head>
 <body class="p-4 flex items-center justify-center min-h-screen">
 
+<!-- 🕒 Notice Modal for After Hours (Add-on) -->
+<div id="timeNoticeModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="tech-glass p-6 rounded-2xl max-w-sm w-full border border-amber-500/40 text-center">
+        <div class="text-amber-400 font-bold text-sm mb-2">⚠️ NOTICE & TIMINGS</div>
+        <p class="text-xs text-slate-300 leading-relaxed mb-4">
+            Working hours are from <strong>9:00 AM to 10:00 PM</strong>.<br><br>
+            If you place an order after 10:00 PM, it will be processed tomorrow morning or handled when active.
+        </p>
+        <button onclick="closeNoticeModal()" class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs">I UNDERSTAND</button>
+    </div>
+</div>
+
 <div class="w-full max-w-md tech-glass p-6 rounded-3xl relative overflow-hidden">
     <!-- Top Tech Accent Bar -->
     <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500"></div>
@@ -164,9 +176,15 @@
 
 <script>
     let currentUser = null;
+    let previousStatuses = {}; // Track previous statuses for push notification comparison
     const cashfree = Cashfree({ mode: "production" });
 
     window.onload = async () => {
+        // Request browser notification permissions on load
+        if ("Notification" in window && Notification.permission !== "granted") {
+            Notification.requestPermission();
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const paymentStatus = urlParams.get('payment');
         const tgId = urlParams.get('telegramChatId');
@@ -180,7 +198,6 @@
         const savedId = localStorage.getItem('cid');
         const savedPass = localStorage.getItem('cpass');
         if(savedId && savedPass) {
-            // Auto login and fetch real coin balance from database
             try {
                 const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ customId: savedId, password: savedPass }) });
                 const data = await res.json();
@@ -192,13 +209,33 @@
         }
     };
 
+    // 🕒 Check time and show notice modal if after 10 PM or before 9 AM
+    function checkWorkingHoursNotice() {
+        const currentHour = new Date().getHours();
+        // If time is >= 22 (10 PM) or < 9 (9 AM)
+        if (currentHour >= 22 || currentHour < 9) {
+            document.getElementById('timeNoticeModal').classList.remove('hidden');
+        }
+    }
+
+    function closeNoticeModal() {
+        document.getElementById('timeNoticeModal').classList.add('hidden');
+    }
+
+    // 🔔 Browser Notification trigger
+    function showBrowserNotification(title, body) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(title, { body: body });
+        }
+    }
+
     async function verifyInstantPayment(telegramChatId, coins, orderId) {
         try {
             const res = await fetch('/api/verify-instant', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId, coins, order_id: orderId }) });
             const data = await res.json();
             if(data.success) {
                 alert(`🎉 Payment Successful! Added ${coins} JPW Coins to your account.`);
-                window.history.replaceState({}, document.title, window.location.pathname);
+                window.location.href = "/app"; // Smart redirect back to /app cleanly
             }
         } catch(e) {}
     }
@@ -274,6 +311,9 @@
         document.getElementById('app-dashboard').classList.remove('hidden');
         document.getElementById('dName').innerText = user.customId || user.name;
         document.getElementById('dCoins').innerText = user.jpwCoins !== undefined ? user.jpwCoins.toFixed(2) : '0.00';
+        
+        // Trigger working hours notice on login
+        checkWorkingHoursNotice();
     }
 
     function logout() {
@@ -358,6 +398,12 @@
             let html = '';
             if(data.regularOrders) {
                 data.regularOrders.forEach(o => {
+                    // Check for status change and send browser notification
+                    if (previousStatuses[o._id] && previousStatuses[o._id] !== o.status) {
+                        showBrowserNotification("JPW Order Update", `Reach ID ${o.targetId} status changed to: ${o.status}`);
+                    }
+                    previousStatuses[o._id] = o.status;
+
                     let badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
                     if(o.status === 'Completed') badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
                     if(o.status === 'Rejected') badgeColor = 'bg-red-500/10 text-red-400 border-red-500/30';
@@ -374,6 +420,11 @@
 
             if(data.srOrders) {
                 data.srOrders.forEach(s => {
+                    if (previousStatuses[s._id] && previousStatuses[s._id] !== s.status) {
+                        showBrowserNotification("JPW SR Update", `SR Order (${s.customerName}) status changed to: ${s.status}`);
+                    }
+                    previousStatuses[s._id] = s.status;
+
                     let badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
                     if(s.status === 'Completed') badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
                     if(s.status === 'Rejected') badgeColor = 'bg-red-500/10 text-red-400 border-red-500/30';
