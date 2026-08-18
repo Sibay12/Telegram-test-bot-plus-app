@@ -52,6 +52,7 @@ let adminPendingReply = {};
 let adminPendingSrReply = {};
 let adminPendingBroadcast = false;
 let adminPendingEditSearch = false;
+let adminPendingCustomerDetails = false; // Flag for customer history view
 let primaryCustomerBotUsername = 'JPWREACHSERVICESBOT';
 let serverPublicUrl = 'https://cashtree.space';
 
@@ -160,7 +161,7 @@ async function notifyAdminSrBot(srOrder) {
                     ]
                 }
             };
-            await tempBot.sendMessage(ADMIN_CHAT_ID, `📌 **New SR Order Received**\n\n👤 Customer Name: ${srOrder.customerName}\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber}\`\n💬 Engineer Chat ID: \`${srOrder.telegramChatId}\``, { parse_mode: 'Markdown', ...keyboard });
+            await tempBot.sendMessage(ADMIN_CHAT_ID, `📌 **New SR Order Received**\n\n👤 Customer Name: ${srOrder.customerName}\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber || 'N/A'}\`\n💬 Engineer Chat ID: \`${srOrder.telegramChatId}\``, { parse_mode: 'Markdown', ...keyboard });
         }
     } catch(e) {}
 }
@@ -181,6 +182,7 @@ function startAdminBot(token) {
             if (text.startsWith('/start') || text.toLowerCase() === 'admin' || text.toLowerCase() === 'menu') {
                 adminPendingBroadcast = false;
                 adminPendingEditSearch = false;
+                adminPendingCustomerDetails = false;
                 const adminKeyboard = {
                     reply_markup: {
                         inline_keyboard: [
@@ -193,7 +195,8 @@ function startAdminBot(token) {
                                 { text: "📢 Send Announcement", callback_data: "admin_broadcast" }
                             ],
                             [
-                                { text: "✏️ Edit Order", callback_data: "admin_edit_order" }
+                                { text: "✏️ Edit Order", callback_data: "admin_edit_order" },
+                                { text: "👤 Customer Details / Logs", callback_data: "admin_customer_details" }
                             ],
                             [
                                 { text: "🌐 Open Admin Web Panel", url: "https://cashtree.space/admin" }
@@ -224,12 +227,56 @@ function startAdminBot(token) {
                 return;
             }
 
-            // ✏️ Edit Order Search Handler (Target ID or SR Mobile Number)
+            // 👤 Customer Details & Order History Search Handler
+            if (adminPendingCustomerDetails) {
+                adminPendingCustomerDetails = false;
+                const searchKey = text;
+
+                let user = await UserModel.findOne({
+                    $or: [{ telegramChatId: searchKey }, { customId: searchKey }, { name: new RegExp(searchKey, 'i') }]
+                });
+
+                let reachOrders = await OrderModel.find({
+                    $or: [{ targetId: searchKey }, { telegramChatId: user ? user.telegramChatId : searchKey }]
+                }).sort({ createdAt: -1 }).limit(5);
+
+                let srOrders = await SrModel.find({
+                    $or: [{ mobileNumber: searchKey }, { customerName: new RegExp(searchKey, 'i') }, { telegramChatId: user ? user.telegramChatId : searchKey }]
+                }).sort({ createdAt: -1 }).limit(5);
+
+                if (!user && reachOrders.length === 0 && srOrders.length === 0) {
+                    bot.sendMessage(chatId, `❌ Koi details nahi mili for: \`${searchKey}\``, { parse_mode: 'Markdown' });
+                    return;
+                }
+
+                let responseMsg = `👤 **Customer & Order Summary** 📋\n\n`;
+                if (user) {
+                    responseMsg += `👤 Name: *${user.name}*\n💬 Chat ID: \`${user.telegramChatId}\`\n🪙 Coins: *${user.jpwCoins.toFixed(2)}*\n📦 Package: *${user.activePackage}*\n\n`;
+                }
+
+                if (reachOrders.length > 0) {
+                    responseMsg += `⚡ **Recent Reach Orders:**\n`;
+                    reachOrders.forEach(ro => {
+                        responseMsg += `• ID: \`${ro.targetId}\` | Pass: \`${ro.targetPass}\`\n  Status: *${ro.status}*\n  Admin Reply: _${ro.adminReply || 'No reply'}\_\n  Date: ${new Date(ro.createdAt).toLocaleDateString()}\n\n`;
+                    });
+                }
+
+                if (srOrders.length > 0) {
+                    responseMsg += `📌 **Recent SR Orders:**\n`;
+                    srOrders.forEach(so => {
+                        responseMsg += `• Name: *${so.customerName}* | Mobile: \`${so.mobileNumber}\`\n  Status: *${so.status}*\n  Replies: _${so.adminReplies.length ? so.adminReplies.join(', ') : 'No reply'}\_\n  Date: ${new Date(so.createdAt).toLocaleDateString()}\n\n`;
+                    });
+                }
+
+                bot.sendMessage(chatId, responseMsg, { parse_mode: 'Markdown' });
+                return;
+            }
+
+            // ✏️ Edit Order Search Handler
             if (adminPendingEditSearch) {
                 adminPendingEditSearch = false;
                 const searchId = text;
 
-                // Search in Reach Orders
                 let order = await OrderModel.findOne({ targetId: searchId }).sort({ createdAt: -1 });
                 if (order) {
                     const orderKeyboard = {
@@ -238,15 +285,17 @@ function startAdminBot(token) {
                                 [
                                     { text: "🔄 Change Status", callback_data: `editstatus_reach_${order._id}` },
                                     { text: "💬 Send Reply", callback_data: `editreply_reach_${order._id}` }
+                                ],
+                                [
+                                    { text: "📋 View Full History", callback_data: `history_reach_${order._id}` }
                                 ]
                             ]
                         }
                     };
-                    bot.sendMessage(chatId, `⚡ **Reach Order Found:**\n\n🎯 Target ID: \`${order.targetId}\`\n🔑 Password: \`${order.targetPass}\`\n📌 Current Status: *${order.status}*\n💬 Chat ID: \`${order.telegramChatId}\`\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...orderKeyboard });
+                    bot.sendMessage(chatId, `⚡ **Reach Order Found:**\n\n🎯 Target ID: \`${order.targetId}\`\n🔑 Password: \`${order.targetPass}\`\n📌 Current Status: *${order.status}*\n💬 Chat ID: \`${order.telegramChatId}\`\n📢 Latest Reply: _${order.adminReply || 'None'}_\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...orderKeyboard });
                     return;
                 }
 
-                // Search in SR Orders
                 let srOrder = await SrModel.findOne({
                     $or: [{ mobileNumber: searchId }, { customerName: new RegExp(searchId, 'i') }]
                 }).sort({ createdAt: -1 });
@@ -258,11 +307,14 @@ function startAdminBot(token) {
                                 [
                                     { text: "🔄 Change Status", callback_data: `editstatus_sr_${srOrder._id}` },
                                     { text: "💬 Send Reply", callback_data: `editreply_sr_${srOrder._id}` }
+                                ],
+                                [
+                                    { text: "📋 View Full History", callback_data: `history_sr_${srOrder._id}` }
                                 ]
                             ]
                         }
                     };
-                    bot.sendMessage(chatId, `📌 **SR Order Found:**\n\n👤 Customer: *${srOrder.customerName}*\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber || 'N/A'}\`\n📌 Current Status: *${srOrder.status}*\n💬 Chat ID: \`${srOrder.telegramChatId}\`\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...srKeyboard });
+                    bot.sendMessage(chatId, `📌 **SR Order Found:**\n\n👤 Customer: *${srOrder.customerName}*\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber || 'N/A'}\`\n📌 Current Status: *${srOrder.status}*\n💬 Chat ID: \`${srOrder.telegramChatId}\`\n📢 Replies: _${srOrder.adminReplies.length ? srOrder.adminReplies.join(' | ') : 'None'}_\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...srKeyboard });
                     return;
                 }
 
@@ -308,6 +360,34 @@ function startAdminBot(token) {
             if (chatId !== ADMIN_CHAT_ID) return;
             const data = query.data;
             const messageId = query.message.message_id;
+
+            // 👤 Customer Details Trigger
+            if (data === 'admin_customer_details') {
+                adminPendingCustomerDetails = true;
+                bot.answerCallbackQuery(query.id);
+                bot.sendMessage(chatId, `🔍 **Customer / Order Details Finder**\n\nKripya **Telegram Chat ID**, **Target ID**, **Customer Mobile** ya **Customer Name** type karke bhejein:`);
+                return;
+            }
+
+            // 📋 History Log View
+            if (data.startsWith('history_')) {
+                bot.answerCallbackQuery(query.id);
+                const [, type, id] = data.split('_');
+                if (type === 'reach') {
+                    let order = await OrderModel.findById(id);
+                    if (order) {
+                        let u = await UserModel.findOne({ telegramChatId: order.telegramChatId });
+                        bot.sendMessage(chatId, `📋 **Reach Order History**\n\n👤 Engineer: *${u ? u.name : 'Unknown'}*\n💬 Chat ID: \`${order.telegramChatId}\`\n🎯 Target ID: \`${order.targetId}\`\n🔑 Password: \`${order.targetPass}\`\n📌 Status: *${order.status}*\n📢 Admin Reply: _${order.adminReply || 'None'}_\n🕒 Created: ${new Date(order.createdAt).toLocaleString()}`, { parse_mode: 'Markdown' });
+                    }
+                } else {
+                    let srOrder = await SrModel.findById(id);
+                    if (srOrder) {
+                        let u = await UserModel.findOne({ telegramChatId: srOrder.telegramChatId });
+                        bot.sendMessage(chatId, `📋 **SR Order History**\n\n👤 Engineer: *${u ? u.name : 'Unknown'}*\n💬 Chat ID: \`${srOrder.telegramChatId}\`\n👤 Customer: *${srOrder.customerName}*\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber || 'N/A'}\`\n📌 Status: *${srOrder.status}*\n📢 Admin Replies:\n${srOrder.adminReplies.length ? srOrder.adminReplies.map((r, i) => `${i+1}. ${r}`).join('\n') : 'None'}\n🕒 Created: ${new Date(srOrder.createdAt).toLocaleString()}`, { parse_mode: 'Markdown' });
+                    }
+                }
+                return;
+            }
 
             // ✏️ Edit Order Triggers
             if (data === 'admin_edit_order') {
@@ -453,8 +533,7 @@ function startAdminBot(token) {
                     if(user){ user.jpwCoins += 1; await user.save(); }
                     await srOrder.save();
                     bot.answerCallbackQuery(query.id, { text: 'Rejected & Refunded!' });
-                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
-                    bot.sendMessage(chatId, `❌ SR Status updated to: *Rejected* (Coin refunded to Engineer)`, { parse_mode: 'Markdown' });
+                    bot.editMessageText(`📌 **SR Order (Rejected & Refunded)**\n👤 Customer: *${srOrder.customerName}*\n📞 Mobile: \`${srOrder.mobileNumber}\`\n💬 Chat ID: \`${srOrder.telegramChatId}\`\n❌ Status: *Rejected*`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }).catch(()=>{});
                     return;
                 } else if (action === 'srinprog') {
                     srOrder.status = 'In Progress';
@@ -466,11 +545,10 @@ function startAdminBot(token) {
                     srOrder.status = 'Completed';
                     await srOrder.save();
                     bot.answerCallbackQuery(query.id, { text: 'Completed!' });
-                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
-                    bot.sendMessage(chatId, `🎉 SR Status updated to: *Completed*`, { parse_mode: 'Markdown' });
+                    bot.editMessageText(`📌 **SR Order (Completed)**\n👤 Customer: *${srOrder.customerName}*\n📞 Mobile: \`${srOrder.mobileNumber}\`\n💬 Chat ID: \`${srOrder.telegramChatId}\`\n🎉 Status: *Completed*`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }).catch(()=>{});
                     return;
                 }
-            } else if (data.includes('_') && !data.startsWith('admin') && !data.startsWith('edit') && !data.startsWith('setst')) {
+            } else if (data.includes('_') && !data.startsWith('admin') && !data.startsWith('edit') && !data.startsWith('setst') && !data.startsWith('history')) {
                 const [action, orderId] = data.split('_');
                 let order = await OrderModel.findById(orderId);
                 if (!order) { bot.answerCallbackQuery(query.id, { text: 'Not found!' }); return; }
@@ -498,8 +576,7 @@ function startAdminBot(token) {
                     if(user){ user.jpwCoins += 1; await user.save(); }
                     await order.save();
                     bot.answerCallbackQuery(query.id, { text: 'Rejected!' });
-                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
-                    bot.sendMessage(chatId, `❌ Reach Order Status: *Rejected* (Coin Refunded)`, { parse_mode: 'Markdown' });
+                    bot.editMessageText(`⚡ **Reach Order (Rejected & Refunded)**\n🎯 ID: \`${order.targetId}\`\n🔑 Pass: \`${order.targetPass}\`\n💬 Chat ID: \`${order.telegramChatId}\`\n❌ Status: *Rejected*`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }).catch(()=>{});
                     return;
                 } else if (action === 'inprogress') {
                     order.status = 'In Progress';
@@ -511,16 +588,14 @@ function startAdminBot(token) {
                     order.status = 'Completed';
                     await order.save();
                     bot.answerCallbackQuery(query.id, { text: 'Completed!' });
-                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
-                    bot.sendMessage(chatId, `🎉 Reach Order Status: *Completed*`, { parse_mode: 'Markdown' });
+                    bot.editMessageText(`⚡ **Reach Order (Completed)**\n🎯 ID: \`${order.targetId}\`\n🔑 Pass: \`${order.targetPass}\`\n💬 Chat ID: \`${order.telegramChatId}\`\n🎉 Status: *Completed*`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }).catch(()=>{});
                     return;
                 } else if (action === 'cancel') {
                     order.status = 'Cancelled & Refunded';
                     if(user){ user.jpwCoins += 1; await user.save(); }
                     await order.save();
                     bot.answerCallbackQuery(query.id, { text: 'Cancelled & Refunded!' });
-                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
-                    bot.sendMessage(chatId, `🚫 Reach Order Status: *Cancelled & Refunded*`, { parse_mode: 'Markdown' });
+                    bot.editMessageText(`⚡ **Reach Order (Cancelled & Refunded)**\n🎯 ID: \`${order.targetId}\`\n🔑 Pass: \`${order.targetPass}\`\n💬 Chat ID: \`${order.telegramChatId}\`\n🚫 Status: *Cancelled & Refunded*`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }).catch(()=>{});
                     return;
                 }
             }
@@ -608,17 +683,14 @@ function startCustomerBot(token, isPrimary) {
 
 // --- API ENDPOINTS ---
 
-// Admin Panel HTML Route
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Mobile Web App HTML Route (Added for /app)
 app.get('/app', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'mobile_app.html'));
 });
 
-// --- NEW ADD-ON APIs FOR MOBILE APP ID/PASSWORD LOGIN & STATUS TRACKING ---
 app.post('/api/register', async (req, res) => {
     try {
         const { customId, password, name } = req.body;
@@ -662,7 +734,6 @@ app.post('/api/app/check-status', async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 });
-// ------------------------------------------------------------------------
 
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
