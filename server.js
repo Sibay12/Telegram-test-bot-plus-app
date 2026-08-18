@@ -50,6 +50,8 @@ const RECHARGE_PACKAGES = [
 let otpStorage = {};
 let adminPendingReply = {};
 let adminPendingSrReply = {};
+let adminPendingBroadcast = false;
+let adminPendingEditSearch = false;
 let primaryCustomerBotUsername = 'JPWREACHSERVICESBOT';
 let serverPublicUrl = 'https://cashtree.space';
 
@@ -126,12 +128,14 @@ function startOrderCleanupTimer() {
 // 🔔 Notification Handlers
 async function notifyAdminAndUser(order, user, messageText) {
     try {
+        // Step 1: Initial state only shows Accept and Reject
         let adminKeyboard = {
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: "✅ Accept", callback_data: `accept_${order._id}` }, { text: "❌ Reject", callback_data: `reject_${order._id}` }],
-                    [{ text: "⏳ In Progress", callback_data: `inprogress_${order._id}` }, { text: "🎉 Complete", callback_data: `complete_${order._id}` }],
-                    [{ text: "💬 Reply", callback_data: `reply_${order._id}` }, { text: "🚫 Cancel & Refund", callback_data: `cancel_${order._id}` }]
+                    [
+                        { text: "✅ Accept", callback_data: `accept_${order._id}` },
+                        { text: "❌ Reject", callback_data: `reject_${order._id}` }
+                    ]
                 ]
             }
         };
@@ -150,9 +154,10 @@ async function notifyAdminSrBot(srOrder) {
             let keyboard = {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: "✅ Accept", callback_data: `sraccept_${srOrder._id}` }, { text: "❌ Reject", callback_data: `srreject_${srOrder._id}` }],
-                        [{ text: "⏳ In Progress", callback_data: `srinprog_${srOrder._id}` }, { text: "🎉 Complete", callback_data: `srcomp_${srOrder._id}` }],
-                        [{ text: "💬 Reply", callback_data: `srreply_${srOrder._id}` }]
+                        [
+                            { text: "✅ Accept", callback_data: `sraccept_${srOrder._id}` },
+                            { text: "❌ Reject", callback_data: `srreject_${srOrder._id}` }
+                        ]
                     ]
                 }
             };
@@ -175,6 +180,8 @@ function startAdminBot(token) {
             const text = msg.text.trim();
 
             if (text.startsWith('/start') || text.toLowerCase() === 'admin' || text.toLowerCase() === 'menu') {
+                adminPendingBroadcast = false;
+                adminPendingEditSearch = false;
                 const adminKeyboard = {
                     reply_markup: {
                         inline_keyboard: [
@@ -183,7 +190,11 @@ function startAdminBot(token) {
                                 { text: "⚡ Pending Reach Orders", callback_data: "admin_reach_orders" }
                             ],
                             [
-                                { text: "📌 Pending SR Orders", callback_data: "admin_sr_orders" }
+                                { text: "📌 Pending SR Orders", callback_data: "admin_sr_orders" },
+                                { text: "📢 Send Announcement", callback_data: "admin_broadcast" }
+                            ],
+                            [
+                                { text: "✏️ Edit Order", callback_data: "admin_edit_order" }
                             ],
                             [
                                 { text: "🌐 Open Admin Web Panel", url: "https://cashtree.space/admin" }
@@ -192,6 +203,71 @@ function startAdminBot(token) {
                     }
                 };
                 await bot.sendMessage(chatId, `👑 **JPW Super Admin Control Panel** 🚀\n\nWelcome Boss! Choose an option below:`, { parse_mode: 'Markdown', ...adminKeyboard });
+                return;
+            }
+
+            // 📢 Announcement Handler
+            if (adminPendingBroadcast) {
+                adminPendingBroadcast = false;
+                const users = await UserModel.find({ telegramChatId: { $not: /^WEB_/ } });
+                let sentCount = 0;
+
+                if (CUSTOMER_BOT_TOKENS[0]) {
+                    const tempCustBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
+                    for (let u of users) {
+                        try {
+                            await tempCustBot.sendMessage(u.telegramChatId, `📢 **Important Announcement from Admin:**\n\n${text}`, { parse_mode: 'Markdown' });
+                            sentCount++;
+                        } catch(err) {}
+                    }
+                }
+                bot.sendMessage(chatId, `✅ Announcement successfully sent to *${sentCount}* active engineers!`, { parse_mode: 'Markdown' });
+                return;
+            }
+
+            // ✏️ Edit Order Search Handler (Target ID or SR Mobile Number)
+            if (adminPendingEditSearch) {
+                adminPendingEditSearch = false;
+                const searchId = text;
+
+                // Search in Reach Orders
+                let order = await OrderModel.findOne({ targetId: searchId }).sort({ createdAt: -1 });
+                if (order) {
+                    const orderKeyboard = {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: "🔄 Change Status", callback_data: `editstatus_reach_${order._id}` },
+                                    { text: "💬 Send Reply", callback_data: `editreply_reach_${order._id}` }
+                                ]
+                            ]
+                        }
+                    };
+                    bot.sendMessage(chatId, `⚡ **Reach Order Found:**\n\n🎯 Target ID: \`${order.targetId}\`\n🔑 Pass: \`${order.targetPass}\`\n📌 Current Status: *${order.status}*\n💬 Chat ID: \`${order.telegramChatId}\`\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...orderKeyboard });
+                    return;
+                }
+
+                // Search in SR Orders
+                let srOrder = await SrModel.findOne({
+                    $or: [{ mobileNumber: searchId }, { customerName: new RegExp(searchId, 'i') }]
+                }).sort({ createdAt: -1 });
+
+                if (srOrder) {
+                    const srKeyboard = {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: "🔄 Change Status", callback_data: `editstatus_sr_${srOrder._id}` },
+                                    { text: "💬 Send Reply", callback_data: `editreply_sr_${srOrder._id}` }
+                                ]
+                            ]
+                        }
+                    };
+                    bot.sendMessage(chatId, `📌 **SR Order Found:**\n\n👤 Customer: *${srOrder.customerName}*\n📞 Mobile: \`${srOrder.mobileNumber}\`\n📌 Current Status: *${srOrder.status}*\n💬 Chat ID: \`${srOrder.telegramChatId}\`\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...srKeyboard });
+                    return;
+                }
+
+                bot.sendMessage(chatId, `❌ Koi bhi order nahi mila Target ID / Mobile: \`${searchId}\``, { parse_mode: 'Markdown' });
                 return;
             }
 
@@ -232,8 +308,91 @@ function startAdminBot(token) {
             const chatId = String(query.message.chat.id);
             if (chatId !== ADMIN_CHAT_ID) return;
             const data = query.data;
+            const messageId = query.message.message_id;
 
-            if (data === 'admin_stats') {
+            // ✏️ Edit Order Triggers
+            if (data === 'admin_edit_order') {
+                adminPendingEditSearch = true;
+                bot.answerCallbackQuery(query.id);
+                bot.sendMessage(chatId, `🔍 **Order Edit Mode**\n\nKripya **Target ID** (Reach ke liye) ya **Mobile Number** (SR ke liye) type karke bhejein:`);
+                return;
+            }
+
+            if (data.startsWith('editstatus_')) {
+                bot.answerCallbackQuery(query.id);
+                const [, type, id] = data.split('_');
+                const statusKeyboard = {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: "✅ Accepted", callback_data: `setst_${type}_${id}_Accepted` },
+                                { text: "⏳ In Progress", callback_data: `setst_${type}_${id}_In Progress` }
+                            ],
+                            [
+                                { text: "🎉 Completed", callback_data: `setst_${type}_${id}_Completed` },
+                                { text: "❌ Rejected", callback_data: `setst_${type}_${id}_Rejected` }
+                            ],
+                            [
+                                { text: "🚫 Cancel & Refund", callback_data: `setst_${type}_${id}_Cancelled & Refunded` }
+                            ]
+                        ]
+                    }
+                };
+                bot.sendMessage(chatId, `🎯 **Naya status select karein:**`, statusKeyboard);
+                return;
+            }
+
+            if (data.startsWith('editreply_')) {
+                bot.answerCallbackQuery(query.id);
+                const [, type, id] = data.split('_');
+                if (type === 'reach') {
+                    adminPendingReply[chatId] = id;
+                    bot.sendMessage(chatId, `✍️ Send reply text for Reach Order:`);
+                } else {
+                    adminPendingSrReply[chatId] = id;
+                    bot.sendMessage(chatId, `✍️ Send reply text for SR Order:`);
+                }
+                return;
+            }
+
+            if (data.startsWith('setst_')) {
+                const [, type, id, status] = data.split('_');
+                bot.answerCallbackQuery(query.id, { text: `Status updated to ${status}` });
+
+                if (type === 'reach') {
+                    let order = await OrderModel.findById(id);
+                    if (order) {
+                        order.status = status;
+                        let user = await UserModel.findOne({ telegramChatId: order.telegramChatId });
+                        if ((status === 'Rejected' || status === 'Cancelled & Refunded') && user) {
+                            user.jpwCoins += 1;
+                            await user.save();
+                        }
+                        await order.save();
+                        bot.sendMessage(chatId, `✅ **Reach Order Updated!**\n🎯 Target ID: \`${order.targetId}\`\n📌 Status: *${order.status}*`, { parse_mode: 'Markdown' });
+                    }
+                } else {
+                    let srOrder = await SrModel.findById(id);
+                    if (srOrder) {
+                        srOrder.status = status;
+                        let user = await UserModel.findOne({ telegramChatId: srOrder.telegramChatId });
+                        if ((status === 'Rejected' || status === 'Cancelled & Refunded') && user) {
+                            user.jpwCoins += 1;
+                            await user.save();
+                        }
+                        await srOrder.save();
+                        bot.sendMessage(chatId, `✅ **SR Order Updated!**\n👤 Customer: *${srOrder.customerName}*\n📌 Status: *${srOrder.status}*`, { parse_mode: 'Markdown' });
+                    }
+                }
+                return;
+            }
+
+            if (data === 'admin_broadcast') {
+                adminPendingBroadcast = true;
+                bot.answerCallbackQuery(query.id);
+                bot.sendMessage(chatId, `✍️ **Type and send your announcement message:**\n(Whatever you send now will be delivered to all engineers instantly)`);
+                return;
+            } else if (data === 'admin_stats') {
                 bot.answerCallbackQuery(query.id);
                 let userCount = await UserModel.countDocuments();
                 let reachCount = await OrderModel.countDocuments();
@@ -247,8 +406,7 @@ function startAdminBot(token) {
                     bot.sendMessage(chatId, `⚡ Reach Order\nID: \`${o.targetId}\`\nChatID: \`${o.telegramChatId}\``, {
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: "✅ Accept", callback_data: `accept_${o._id}` }, { text: "❌ Reject", callback_data: `reject_${o._id}` }],
-                                [{ text: "💬 Reply", callback_data: `reply_${o._id}` }]
+                                [{ text: "✅ Accept", callback_data: `accept_${o._id}` }, { text: "❌ Reject", callback_data: `reject_${o._id}` }]
                             ]
                         }
                     });
@@ -261,8 +419,7 @@ function startAdminBot(token) {
                     bot.sendMessage(chatId, `📌 SR Order\nCustomer: ${s.customerName}\nMobile: \`${s.mobileNumber}\``, {
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: "✅ Accept", callback_data: `sraccept_${s._id}` }, { text: "❌ Reject", callback_data: `srreject_${s._id}` }],
-                                [{ text: "💬 Reply", callback_data: `srreply_${s._id}` }]
+                                [{ text: "✅ Accept", callback_data: `sraccept_${s._id}` }, { text: "❌ Reject", callback_data: `srreject_${s._id}` }]
                             ]
                         }
                     });
@@ -278,15 +435,41 @@ function startAdminBot(token) {
                     bot.answerCallbackQuery(query.id);
                     bot.sendMessage(chatId, `✍️ Send reply text for SR (${srOrder.customerName}):`);
                     return;
-                } else if (action === 'sraccept') { srOrder.status = 'Accepted'; }
-                else if (action === 'srreject') { srOrder.status = 'Rejected'; if(user){user.jpwCoins+=1;await user.save();} }
-                else if (action === 'srinprog') { srOrder.status = 'In Progress'; }
-                else if (action === 'srcomp') { srOrder.status = 'Completed'; }
-
-                await srOrder.save();
-                bot.answerCallbackQuery(query.id, { text: 'Updated!' });
-                bot.sendMessage(chatId, `✅ SR Status updated to: *${srOrder.status}*`, { parse_mode: 'Markdown' });
-            } else if (data.includes('_') && !data.startsWith('admin')) {
+                } else if (action === 'sraccept') {
+                    srOrder.status = 'Accepted';
+                    await srOrder.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Accepted!' });
+                    let inProgressKeyboard = {
+                        inline_keyboard: [
+                            [{ text: "⏳ In Progress", callback_data: `srinprog_${srOrder._id}` }, { text: "🎉 Complete", callback_data: `srcomp_${srOrder._id}` }],
+                            [{ text: "💬 Reply", callback_data: `srreply_${srOrder._id}` }, { text: "❌ Reject & Refund", callback_data: `srreject_${srOrder._id}` }]
+                        ]
+                    };
+                    bot.editMessageReplyMarkup(inProgressKeyboard, { chat_id: chatId, message_id: messageId }).catch(()=>{});
+                    return;
+                } else if (action === 'srreject') {
+                    srOrder.status = 'Rejected';
+                    if(user){ user.jpwCoins += 1; await user.save(); }
+                    await srOrder.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Rejected & Refunded!' });
+                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
+                    bot.sendMessage(chatId, `❌ SR Status updated to: *Rejected* (Coin refunded to Engineer)`, { parse_mode: 'Markdown' });
+                    return;
+                } else if (action === 'srinprog') {
+                    srOrder.status = 'In Progress';
+                    await srOrder.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Marked In Progress!' });
+                    bot.sendMessage(chatId, `⏳ SR Status: *In Progress*`, { parse_mode: 'Markdown' });
+                    return;
+                } else if (action === 'srcomp') {
+                    srOrder.status = 'Completed';
+                    await srOrder.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Completed!' });
+                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
+                    bot.sendMessage(chatId, `🎉 SR Status updated to: *Completed*`, { parse_mode: 'Markdown' });
+                    return;
+                }
+            } else if (data.includes('_') && !data.startsWith('admin') && !data.startsWith('edit') && !data.startsWith('setst')) {
                 const [action, orderId] = data.split('_');
                 let order = await OrderModel.findById(orderId);
                 if (!order) { bot.answerCallbackQuery(query.id, { text: 'Not found!' }); return; }
@@ -297,15 +480,48 @@ function startAdminBot(token) {
                     bot.answerCallbackQuery(query.id);
                     bot.sendMessage(chatId, `✍️ Send reply text for Reach Order ID: \`${order.targetId}\``);
                     return;
-                } else if (action === 'accept') { order.status = 'Accepted'; }
-                else if (action === 'reject') { order.status = 'Rejected'; if(user){user.jpwCoins+=1;await user.save();} }
-                else if (action === 'inprogress') { order.status = 'In Progress'; }
-                else if (action === 'complete') { order.status = 'Completed'; }
-                else if (action === 'cancel') { order.status = 'Cancelled & Refunded'; if(user){user.jpwCoins+=1;await user.save();} }
-
-                await order.save();
-                bot.answerCallbackQuery(query.id, { text: 'Updated!' });
-                bot.sendMessage(chatId, `✅ Reach Order Status updated to: *${order.status}*`, { parse_mode: 'Markdown' });
+                } else if (action === 'accept') {
+                    order.status = 'Accepted';
+                    await order.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Accepted!' });
+                    let activeActionsKeyboard = {
+                        inline_keyboard: [
+                            [{ text: "⏳ In Progress", callback_data: `inprogress_${order._id}` }, { text: "🎉 Complete", callback_data: `complete_${order._id}` }],
+                            [{ text: "💬 Reply", callback_data: `reply_${order._id}` }, { text: "🚫 Cancel & Refund", callback_data: `cancel_${order._id}` }]
+                        ]
+                    };
+                    bot.editMessageReplyMarkup(activeActionsKeyboard, { chat_id: chatId, message_id: messageId }).catch(()=>{});
+                    return;
+                } else if (action === 'reject') {
+                    order.status = 'Rejected';
+                    if(user){ user.jpwCoins += 1; await user.save(); }
+                    await order.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Rejected!' });
+                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
+                    bot.sendMessage(chatId, `❌ Reach Order Status: *Rejected* (Coin Refunded)`, { parse_mode: 'Markdown' });
+                    return;
+                } else if (action === 'inprogress') {
+                    order.status = 'In Progress';
+                    await order.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Marked In Progress!' });
+                    bot.sendMessage(chatId, `⏳ Reach Order Status: *In Progress*`, { parse_mode: 'Markdown' });
+                    return;
+                } else if (action === 'complete') {
+                    order.status = 'Completed';
+                    await order.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Completed!' });
+                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
+                    bot.sendMessage(chatId, `🎉 Reach Order Status: *Completed*`, { parse_mode: 'Markdown' });
+                    return;
+                } else if (action === 'cancel') {
+                    order.status = 'Cancelled & Refunded';
+                    if(user){ user.jpwCoins += 1; await user.save(); }
+                    await order.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Cancelled & Refunded!' });
+                    bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId }).catch(()=>{});
+                    bot.sendMessage(chatId, `🚫 Reach Order Status: *Cancelled & Refunded*`, { parse_mode: 'Markdown' });
+                    return;
+                }
             }
         });
     } catch(e) {}
