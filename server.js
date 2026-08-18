@@ -69,8 +69,8 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
 // --- SCHEMAS ---
 const userSchema = new mongoose.Schema({
     telegramChatId: { type: String, required: true, unique: true },
-    customId: { type: String, unique: true, sparse: true }, // Added for Web App ID login
-    password: { type: String, default: null },                 // Added for Web App Password login
+    customId: { type: String, unique: true, sparse: true },
+    password: { type: String, default: null },
     name: { type: String, default: 'Engineer' },
     jpwCoins: { type: Number, default: 0 },
     activePackage: { type: String, default: 'No active package' },
@@ -128,7 +128,6 @@ function startOrderCleanupTimer() {
 // 🔔 Notification Handlers
 async function notifyAdminAndUser(order, user, messageText) {
     try {
-        // Step 1: Initial state only shows Accept and Reject
         let adminKeyboard = {
             reply_markup: {
                 inline_keyboard: [
@@ -243,7 +242,7 @@ function startAdminBot(token) {
                             ]
                         }
                     };
-                    bot.sendMessage(chatId, `⚡ **Reach Order Found:**\n\n🎯 Target ID: \`${order.targetId}\`\n🔑 Pass: \`${order.targetPass}\`\n📌 Current Status: *${order.status}*\n💬 Chat ID: \`${order.telegramChatId}\`\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...orderKeyboard });
+                    bot.sendMessage(chatId, `⚡ **Reach Order Found:**\n\n🎯 Target ID: \`${order.targetId}\`\n🔑 Password: \`${order.targetPass}\`\n📌 Current Status: *${order.status}*\n💬 Chat ID: \`${order.telegramChatId}\`\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...orderKeyboard });
                     return;
                 }
 
@@ -263,7 +262,7 @@ function startAdminBot(token) {
                             ]
                         }
                     };
-                    bot.sendMessage(chatId, `📌 **SR Order Found:**\n\n👤 Customer: *${srOrder.customerName}*\n📞 Mobile: \`${srOrder.mobileNumber}\`\n📌 Current Status: *${srOrder.status}*\n💬 Chat ID: \`${srOrder.telegramChatId}\`\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...srKeyboard });
+                    bot.sendMessage(chatId, `📌 **SR Order Found:**\n\n👤 Customer: *${srOrder.customerName}*\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber || 'N/A'}\`\n📌 Current Status: *${srOrder.status}*\n💬 Chat ID: \`${srOrder.telegramChatId}\`\n\n👇 **Kya karna chahte hain?**`, { parse_mode: 'Markdown', ...srKeyboard });
                     return;
                 }
 
@@ -369,7 +368,7 @@ function startAdminBot(token) {
                             await user.save();
                         }
                         await order.save();
-                        bot.sendMessage(chatId, `✅ **Reach Order Updated!**\n🎯 Target ID: \`${order.targetId}\`\n📌 Status: *${order.status}*`, { parse_mode: 'Markdown' });
+                        bot.sendMessage(chatId, `✅ **Reach Order Updated!**\n🎯 Target ID: \`${order.targetId}\`\n🔑 Password: \`${order.targetPass}\`\n📌 Status: *${order.status}*`, { parse_mode: 'Markdown' });
                     }
                 } else {
                     let srOrder = await SrModel.findById(id);
@@ -403,7 +402,8 @@ function startAdminBot(token) {
                 let pending = await OrderModel.find({ status: 'Pending' }).limit(5);
                 if(pending.length === 0) { bot.sendMessage(chatId, "✅ No pending Reach orders!"); return; }
                 pending.forEach(o => {
-                    bot.sendMessage(chatId, `⚡ Reach Order\nID: \`${o.targetId}\`\nChatID: \`${o.telegramChatId}\``, {
+                    bot.sendMessage(chatId, `⚡ **Reach Order**\n🎯 Target ID: \`${o.targetId}\`\n🔑 Password: \`${o.targetPass}\`\n💬 Chat ID: \`${o.telegramChatId}\``, {
+                        parse_mode: 'Markdown',
                         reply_markup: {
                             inline_keyboard: [
                                 [{ text: "✅ Accept", callback_data: `accept_${o._id}` }, { text: "❌ Reject", callback_data: `reject_${o._id}` }]
@@ -416,7 +416,8 @@ function startAdminBot(token) {
                 let pendingSr = await SrModel.find({ status: 'Pending' }).limit(5);
                 if(pendingSr.length === 0) { bot.sendMessage(chatId, "✅ No pending SR orders!"); return; }
                 pendingSr.forEach(s => {
-                    bot.sendMessage(chatId, `📌 SR Order\nCustomer: ${s.customerName}\nMobile: \`${s.mobileNumber}\``, {
+                    bot.sendMessage(chatId, `📌 **SR Order**\n👤 Customer: ${s.customerName}\n📞 Mobile: \`${s.mobileNumber}\`\n☎️ Landline: \`${s.landlineNumber || 'N/A'}\`\n💬 Chat ID: \`${s.telegramChatId}\``, {
+                        parse_mode: 'Markdown',
                         reply_markup: {
                             inline_keyboard: [
                                 [{ text: "✅ Accept", callback_data: `sraccept_${s._id}` }, { text: "❌ Reject", callback_data: `srreject_${s._id}` }]
