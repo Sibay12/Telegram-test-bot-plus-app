@@ -160,8 +160,8 @@ function startSmartGreetingsTimer() {
                 ];
             } else {
                 greetingOptions = [
-                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar के kaam के बाद अब aaram kijiye! 🌌",
-                    "🌙 **Late Night Check!**\n\nService hours close hone wale hain. Apni health का dhyan rakhein aur achhi neend lein. Good night! 😴"
+                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam के बाद अब aaram kijiye! 🌌",
+                    "🌙 **Late Night Check!**\n\nService hours close hone wale hain. Apni health ka dhyan rakhein aur achhi neend lein. Good night! 😴"
                 ];
             }
 
@@ -297,120 +297,63 @@ function initAllBots() {
     if (ADMIN_BOT_TOKEN) startAdminBot(ADMIN_BOT_TOKEN);
 }
 
-// 🤖 Reseller Bot Management
 function startResellerBot(token) {
     try {
         const bot = new TelegramBot(token, { polling: true });
         bot.on('polling_error', () => {});
-
         bot.on('message', async (msg) => {
             if (!msg || !msg.chat || !msg.text) return;
             const chatId = String(msg.chat.id);
             const text = msg.text.trim();
             const resellerName = msg.from.first_name || 'Reseller Partner';
-
             let user = await UserModel.findOne({ telegramChatId: chatId });
-            if (!user) {
-                user = await UserModel.create({ telegramChatId: chatId, name: resellerName, jpwCoins: 0 });
-            }
-
+            if (!user) { user = await UserModel.create({ telegramChatId: chatId, name: resellerName, jpwCoins: 0 }); }
             if (resellerOrderSessions[chatId] && resellerOrderSessions[chatId].step === 'waiting_target_pass') {
                 const targetPass = text;
                 const targetId = resellerOrderSessions[chatId].targetId;
                 delete resellerOrderSessions[chatId];
-
-                if (!isServiceOpen()) {
-                    await bot.sendMessage(chatId, '⛔ हमारी सेवा का समय सुबह 7:00 AM से रात 10:00 PM तक है।');
-                    return;
-                }
-
-                if (user.jpwCoins < 1) {
-                    await bot.sendMessage(chatId, '❌ Insufficient JPW Coins! Balance is low.');
-                    return;
-                }
-
+                if (!isServiceOpen()) { await bot.sendMessage(chatId, '⛔ हमारी सेवा का समय सुबह 7:00 AM से रात 10:00 PM तक है।'); return; }
+                if (user.jpwCoins < 1) { await bot.sendMessage(chatId, '❌ Insufficient JPW Coins! Balance is low.'); return; }
                 user.jpwCoins -= 1;
                 await user.save();
-
                 const newOrder = await OrderModel.create({ telegramChatId: chatId, targetId, targetPass, isPriority: true });
                 const sent = await forwardOrderToTargetBot(targetId, targetPass);
-
-                if (!sent) {
-                    user.jpwCoins += 1;
-                    await user.save();
-                    newOrder.status = 'Rejected';
-                    await newOrder.save();
-                    await bot.sendMessage(chatId, '⚠️ Bot unreachable. Coin refunded.');
-                    return;
-                }
-
+                if (!sent) { user.jpwCoins += 1; await user.save(); newOrder.status = 'Rejected'; await newOrder.save(); await bot.sendMessage(chatId, '⚠️ Bot unreachable. Coin refunded.'); return; }
                 await bot.sendMessage(chatId, `✅ **Priority Reach Order Executed Successfully!**\n🎯 Target ID: \`${targetId}\`\n🪙 Remaining Coins: *${user.jpwCoins.toFixed(2)}*`, { parse_mode: 'Markdown' });
                 return;
             }
-
             if (text.startsWith('/start') || text.toLowerCase() === 'menu') {
                 const welcomeMsg = `✨ **Welcome back, ${resellerName}!** 🚀\n\n🆔 Chat ID: \`${chatId}\`\n🪙 Coins Balance: *${user.jpwCoins.toFixed(2)} Coins*\n\n👇 *Select an option below:*`;
-                
-                const keyboard = {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: "⚡ Submit Reach Order", callback_data: "bot_reseller_reach" }],
-                            [{ text: "🪙 Check Balance", callback_data: "bot_reseller_balance" }, { text: "📦 Buy Packages", callback_data: "bot_reseller_packages" }],
-                            [{ text: "📊 Live Order Tracker", callback_data: "bot_reseller_status" }],
-                            [{ text: "🚀 Open Web Hub Portal", web_app: { url: "https://cashtree.space/reseller" } }],
-                            [{ text: "💬 WhatsApp Support", url: "https://wa.me/919382856020" }]
-                        ]
-                    }
-                };
-
+                const keyboard = { reply_markup: { inline_keyboard: [
+                    [{ text: "⚡ Submit Reach Order", callback_data: "bot_reseller_reach" }],
+                    [{ text: "🪙 Check Balance", callback_data: "bot_reseller_balance" }, { text: "📦 Buy Packages", callback_data: "bot_reseller_packages" }],
+                    [{ text: "📊 Live Order Tracker", callback_data: "bot_reseller_status" }],
+                    [{ text: "🚀 Open Web Hub Portal", web_app: { url: "https://cashtree.space/reseller" } }],
+                    [{ text: "💬 WhatsApp Support", url: "https://wa.me/919382856020" }]
+                ]}};
                 await bot.sendMessage(chatId, welcomeMsg, { parse_mode: 'Markdown', ...keyboard });
                 return;
             }
-
             const parts = text.split(/\s+/);
             if (parts.length === 2 && !text.startsWith('/')) {
                 const targetId = parts[0].trim();
                 const targetPass = parts[1].trim();
-
-                if (user.jpwCoins < 1) {
-                    await bot.sendMessage(chatId, '❌ Insufficient JPW Coins!');
-                    return;
-                }
-
+                if (user.jpwCoins < 1) { await bot.sendMessage(chatId, '❌ Insufficient JPW Coins!'); return; }
                 user.jpwCoins -= 1;
                 await user.save();
-
-                const newOrder = await OrderModel.create({ telegramChatId: chatId, targetId, targetPass, isPriority: true });
+                await OrderModel.create({ telegramChatId: chatId, targetId, targetPass, isPriority: true });
                 await forwardOrderToTargetBot(targetId, targetPass);
                 await bot.sendMessage(chatId, `✅ Order submitted via Direct Chat!\n🎯 ID: \`${targetId}\`\n🪙 Coins left: *${user.jpwCoins.toFixed(2)}*`, { parse_mode: 'Markdown' });
             }
         });
-
         bot.on('callback_query', async (query) => {
             const chatId = String(query.message.chat.id);
             const data = query.data;
             let user = await UserModel.findOne({ telegramChatId: chatId });
-
-            if (data === 'bot_reseller_reach') {
-                bot.answerCallbackQuery(query.id);
-                resellerOrderSessions[chatId] = { step: 'waiting_target_pass' };
-                bot.sendMessage(chatId, `⚡ **Send Target ID & Password** in format: \`TargetID Password\` (e.g. \`12345678 mypass\`)`, { parse_mode: 'Markdown' });
-            } else if (data === 'bot_reseller_balance') {
-                bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `🪙 Your wholesale balance: *${user ? user.jpwCoins.toFixed(2) : 0} Coins*`, { parse_mode: 'Markdown' });
-            } else if (data === 'bot_reseller_packages') {
-                bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `📦 **Wholesale Packages:**\n\n• 10 Coins - ₹95\n• 50 Coins - ₹425\n• 150 Coins (VIP) - ₹1050\n\n👉 Pay via UPI: \`Paytm.s2ujlw0@pty\` and send screenshot to WhatsApp: https://wa.me/919382856020`, { parse_mode: 'Markdown' });
-            } else if (data === 'bot_reseller_status') {
-                bot.answerCallbackQuery(query.id);
-                const orders = await OrderModel.find({ telegramChatId: chatId }).sort({ createdAt: -1 }).limit(5);
-                let text = `📊 **Recent Orders Status:**\n\n`;
-                if(orders.length === 0) text += `No orders found.`;
-                orders.forEach(o => {
-                    text += `• \`${o.targetId}\` ➔ *${o.status}*\n`;
-                });
-                bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
-            }
+            if (data === 'bot_reseller_reach') { bot.answerCallbackQuery(query.id); resellerOrderSessions[chatId] = { step: 'waiting_target_pass' }; bot.sendMessage(chatId, `⚡ **Send Target ID & Password** in format: \`TargetID Password\` (e.g. \`12345678 mypass\`)`, { parse_mode: 'Markdown' }); }
+            else if (data === 'bot_reseller_balance') { bot.answerCallbackQuery(query.id); bot.sendMessage(chatId, `🪙 Your wholesale balance: *${user ? user.jpwCoins.toFixed(2) : 0} Coins*`, { parse_mode: 'Markdown' }); }
+            else if (data === 'bot_reseller_packages') { bot.answerCallbackQuery(query.id); bot.sendMessage(chatId, `📦 **Wholesale Packages:**\n\n• 10 Coins - ₹95\n• 50 Coins - ₹425\n• 150 Coins (VIP) - ₹1050\n\n👉 Pay via UPI: \`Paytm.s2ujlw0@pty\` and send screenshot to WhatsApp: https://wa.me/919382856020`, { parse_mode: 'Markdown' }); }
+            else if (data === 'bot_reseller_status') { bot.answerCallbackQuery(query.id); const orders = await OrderModel.find({ telegramChatId: chatId }).sort({ createdAt: -1 }).limit(5); let text = `📊 **Recent Orders Status:**\n\n`; if(orders.length === 0) text += `No orders found.`; orders.forEach(o => { text += `• \`${o.targetId}\` ➔ *${o.status}*\n`; }); bot.sendMessage(chatId, text, { parse_mode: 'Markdown' }); }
         });
     } catch(e) {}
 }
@@ -432,101 +375,46 @@ function startAdminBot(token) {
     } catch(e) {}
 }
 
-// 🤖 Customer Bot Management (Restored & Fixed)
 function startCustomerBot(token, isPrimary) {
     try {
         const bot = new TelegramBot(token, { polling: true });
         bot.on('polling_error', () => {});
-
-        let currentBotUsername = '';
-        bot.getMe().then(info => {
-            currentBotUsername = info.username;
-        }).catch(() => {});
-
         bot.on('message', async (msg) => {
             if (!msg || !msg.chat || !msg.text) return;
             const chatId = String(msg.chat.id);
             if (chatId === ADMIN_CHAT_ID) return;
-
             const text = msg.text.trim();
             const portalUrl = "https://cashtree.space";
-
             if (text.startsWith('/start') || text.toLowerCase() === 'menu') {
                 let user = await UserModel.findOne({ telegramChatId: chatId });
-                if (!user) {
-                    user = await UserModel.create({ telegramChatId: chatId, name: msg.from.first_name || 'Engineer', jpwCoins: 0 });
-                }
-
-                const keyboard = {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: "🚀 Open Mini App Portal", web_app: { url: portalUrl } }],
-                            [{ text: "⚡ Regular Reach Service", callback_data: "bot_menu_reach" }, { text: "📌 SR Service", callback_data: "bot_menu_sr" }],
-                            [{ text: "🪙 Check Balance", callback_data: "bot_menu_balance" }, { text: "🎁 Daily Bonus", callback_data: "bot_menu_bonus" }],
-                            [{ text: "📦 Buy Coins Packages", callback_data: "bot_menu_packages" }, { text: "🤝 Share Coins", callback_data: "bot_menu_transfer" }],
-                            [{ text: "📞 Support / Contact", callback_data: "bot_menu_contact" }, { text: "💬 WhatsApp Support", url: "https://wa.me/919382856020" }]
-                        ]
-                    }
-                };
-
-                await bot.sendMessage(chatId, `✨ **Welcome to JPW Engineer Portal Bot!** 🚀\n\n👤 Engineer: *${user.name}*\n🆔 Chat ID: \`${chatId}\`\n🪙 Coins Balance: *${user.jpwCoins.toFixed(2)} Coins*\n\n👇 *Choose an option:*`, { parse_mode: 'Markdown', ...keyboard });
-                return;
-            }
-
-            const parts = text.split(/\s+/);
-            if (parts.length === 2 && !text.startsWith('/')) {
-                const targetId = parts[0].trim();
-                const targetPass = parts[1].trim();
-
-                if (!isServiceOpen()) {
-                    await bot.sendMessage(chatId, '⛔ हमारी सेवा का समय सुबह 7:00 AM से रात 10:00 PM तक है। कृपया निर्धारित समय के भीतर प्रयास करें।');
-                    return;
-                }
-
-                let user = await UserModel.findOne({ telegramChatId: chatId });
-                if (!user || user.jpwCoins < 1) {
-                    await bot.sendMessage(chatId, '❌ Insufficient JPW Coins!');
-                    return;
-                }
-
-                user.jpwCoins -= 1;
-                await user.save();
-
-                const newOrder = await OrderModel.create({ telegramChatId: chatId, targetId, targetPass });
-                const sent = await forwardOrderToTargetBot(targetId, targetPass);
-
-                if (!sent) {
-                    user.jpwCoins += 1;
-                    await user.save();
-                    newOrder.status = 'Rejected';
-                    await newOrder.save();
-                    await bot.sendMessage(chatId, '⚠️ बॉट से संपर्क नहीं हो सका। आपका 1 कॉइन वापस कर दिया गया है।');
-                    return;
-                }
-
-                await bot.sendMessage(chatId, `✅ **Order Placed Successfully via Direct Chat!**\n🎯 Target ID: \`${targetId}\`\n🪙 Remaining Coins: *${user.jpwCoins.toFixed(2)}*`, { parse_mode: 'Markdown' });
-                return;
+                if (!user) { user = await UserModel.create({ telegramChatId: chatId, name: msg.from.first_name || 'Engineer', jpwCoins: 0 }); }
+                const keyboard = { reply_markup: { inline_keyboard: [
+                    [{ text: "🚀 Open Mini App Portal", web_app: { url: portalUrl } }],
+                    [{ text: "⚡ Regular Reach Service", callback_data: "bot_menu_reach" }, { text: "📌 SR Service", callback_data: "bot_menu_sr" }],
+                    [{ text: "🪙 Check Balance", callback_data: "bot_menu_balance" }, { text: "🎁 Daily Bonus", callback_data: "bot_menu_bonus" }],
+                    [{ text: "📦 Buy Coins Packages", callback_data: "bot_menu_packages" }, { text: "💬 WhatsApp Support", url: "https://wa.me/919382856020" }]
+                ]}};
+                await bot.sendMessage(chatId, `✨ **Welcome to JPW Engineer Portal!** 🚀\n\n🆔 Chat ID: \`${chatId}\`\n🪙 Coins: *${user.jpwCoins.toFixed(2)}*`, { parse_mode: 'Markdown', ...keyboard });
             }
         });
-
         bot.on('callback_query', async (query) => {
             const chatId = String(query.message.chat.id);
             if (chatId === ADMIN_CHAT_ID) return;
             const data = query.data;
+            const portalUrl = "https://cashtree.space";
             let user = await UserModel.findOne({ telegramChatId: chatId });
-
-            if (data === 'bot_menu_balance') {
+            if (data === 'bot_menu_reach' || data === 'bot_menu_sr' || data === 'bot_menu_packages') {
                 bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `🪙 Your current balance: *${user ? user.jpwCoins.toFixed(2) : 0} Coins*`, { parse_mode: 'Markdown' });
-            } else if (data === 'bot_menu_contact') {
+                bot.sendMessage(chatId, `🚀 Open Mini App: ${portalUrl}`, { parse_mode: 'Markdown' });
+            } else if (data === 'bot_menu_balance') {
                 bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `📞 Contact admin via WhatsApp: https://wa.me/919382856020`, { parse_mode: 'Markdown' });
+                bot.sendMessage(chatId, `🪙 Your balance: *${user ? user.jpwCoins.toFixed(2) : 0} Coins*`, { parse_mode: 'Markdown' });
             }
         });
     } catch(e) {}
 }
 
-// --- API ENDPOINTS ---
+// --- API ENDPOINTS (FIXED & ADD-ON) ---
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'admin.html')); });
 app.get('/app', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'mobile_app.html')); });
 app.get('/reseller', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'reseller.html')); });
@@ -624,7 +512,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// ➕ ADD-ON & FIX: Auth Check & OTP Routes (Fixes Index Page Network Error)
 app.post('/api/auth/check-user-type', async (req, res) => {
     try {
         const { identifier } = req.body;
@@ -632,7 +519,7 @@ app.post('/api/auth/check-user-type', async (req, res) => {
         if(user) {
             res.json({ success: true, telegramChatId: user.telegramChatId, authType: user.password ? 'PASSWORD' : 'OTP' });
         } else {
-            res.json({ success: false, message: 'User not found! Please start bot first.' });
+            res.json({ success: false, message: 'User not found!' });
         }
     } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -688,7 +575,7 @@ app.post('/api/mini-app/auth', async (req, res) => {
     } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ➕ ADD-ON: Mobile App Status Check API (Fixed Sync Error)
+// ➕ ADD-ON: Mobile App Status Check API
 app.post('/api/app/check-status', async (req, res) => {
     try {
         const { telegramChatId } = req.body;
@@ -743,6 +630,11 @@ app.post('/api/user/passbook', async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, statement: [] });
     }
+});
+
+// 📦 RECHARGE PACKAGES API (Added Add-on)
+app.get('/api/packages', (req, res) => {
+    res.json({ success: true, packages: RECHARGE_PACKAGES });
 });
 
 app.post('/api/pay', async (req, res) => {
