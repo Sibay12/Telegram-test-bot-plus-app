@@ -4,6 +4,9 @@ const cors = require('cors');
 const path = require('path');
 const https = require('https');
 const TelegramBot = require('node-telegram-bot-api');
+const { TelegramClient } = require("telegram");
+const { StringSession } = require("telegram/sessions");
+const { NewMessage } = require("telegram/events");
 const { debugLog, getRecentLogs } = require('./utils/logger');
 const adsModule = require('./adsModule');
 
@@ -24,6 +27,17 @@ const PORT = process.env.PORT || 3000;
 const MONGO_URI = 'mongodb+srv://sibadityapal47_db_user:G95Dds7IGyBQNmGh@cluster0.yjvazin.mongodb.net/jpw_bot?retryWrites=true&w=majority';
 const ADMIN_SECRET_PASS = 'jpwadmin123';
 const ADMIN_CHAT_ID = '7659178694';
+
+// 🔑 Telegram Userbot MTProto Credentials
+const TELEGRAM_API_ID = 38455899;
+const TELEGRAM_API_HASH = '8ac60b108999ecd996b12a6f6d1e66b1';
+const TELEGRAM_SESSION_STRING = '1BQANOTEuMTA4LjU2LjEzMgG7wbV1tN8uiJlNmwa0DakcabyRVzTLERHbQnMpd9Pf+r/OxQ10aXpYCUmuq5mDn+hOqqbEpQyPBZuMo8U7gvAcRL5fcdPLOFJE069pmIwPho8ldbaDlC/m0VtDVui1jGVtVTV/w2zQmbfIXiw6lnZHQu3q5tqWCSg+ue18BMl1wjDlqE14ZNrczrVMP7ddUWIo5x1CskvLuLV5dF096xEvWc64ieYkL2+tVwigrXR9DIOfC1brU5D1l1GaQPdTH+96ck/3tmViEwo8NRD71lS6FFTptlcVBUVtaQczLoFGc+GbJflwM+MrLExju/coYPLeV0vxJi9eTZjA17IaGIxCgA==';
+
+// 👇 Jis Bot ko ID/Pass bhejte hain uska username dalein
+const TARGET_THIRD_PARTY_BOT = process.env.TARGET_BOT_USERNAME || '@JPWREACHEDBOT';
+
+let userbotClient = null;
+const activeCheckIntervals = {};
 
 // 🔑 Cashfree Production Credentials
 const CASHFREE_CLIENT_ID = '132151420cc80e33a29ab5a896e4151231';
@@ -52,9 +66,197 @@ let adminPendingReply = {};
 let adminPendingSrReply = {};
 let adminPendingBroadcast = false;
 let adminPendingEditSearch = false;
-let adminPendingCustomerDetails = false; // Flag for customer history view
+let adminPendingCustomerDetails = false;
 let primaryCustomerBotUsername = 'JPWREACHSERVICESBOT';
 let serverPublicUrl = 'https://cashtree.space';
+
+// 🕒 Working Hours Checker (Updated: 7:00 AM - 10:00 PM IST)
+function isServiceOpen() {
+    const now = new Date();
+    const istHours = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getHours();
+    return istHours >= 7 && istHours < 22;
+}
+
+// 🛡️ Intelligent Message Sanitizer (Filters Sensitive Data & Updates to Live Time)
+function sanitizeCustomerMessage(rawText) {
+    if (!rawText) return '';
+    const getCurrentTime = () => {
+        return new Date().toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    };
+
+    let sanitized = rawText
+        .split('\n')
+        .filter(line => {
+            const lower = line.toLowerCase();
+            return !lower.includes('remaining reaches') &&
+                    !lower.includes('plan:') &&
+                    !lower.includes('valid till') &&
+                    !lower.includes('subscription') &&
+                    !lower.includes('use money on next reach') &&
+                    !lower.includes('wallet balance:');
+        })
+        .join('\n');
+
+    sanitized = sanitized.replace(/\d{1,2}:\d{2}\s?(am|pm|AM|PM)/gi, getCurrentTime());
+    return sanitized.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// ⏱️ Auto-Polling Manager (2 Mins Interval, Max 10 Mins)
+function startAutoRecheck(orderId, targetId, targetPass) {
+    if (activeCheckIntervals[orderId]) return;
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    debugLog('Userbot', `⏳ Auto-polling started for ${targetId} (every 2 mins)`);
+
+    activeCheckIntervals[orderId] = setInterval(async () => {
+        attempts++;
+        try {
+            const currentOrder = await OrderModel.findById(orderId);
+            if (!currentOrder || ['Completed', 'Rejected', 'Cancelled & Refunded'].includes(currentOrder.status)) {
+                stopAutoRecheck(orderId);
+                return;
+            }
+
+            if (attempts >= maxAttempts) {
+                debugLog('Userbot', `⏹️ Max 10 mins reached for ${targetId}. Stopping auto-polling.`);
+                stopAutoRecheck(orderId);
+                return;
+            }
+
+            await forwardOrderToTargetBot(targetId, targetPass);
+            debugLog('Userbot', `🔄 Auto-recheck sent (${attempts}/${maxAttempts}) for ${targetId}`);
+        } catch (e) {
+            debugLog('Userbot', `❌ Auto-recheck error: ${e.message}`);
+        }
+    }, 2 * 60 * 1000);
+}
+
+function stopAutoRecheck(orderId) {
+    if (activeCheckIntervals[orderId]) {
+        clearInterval(activeCheckIntervals[orderId]);
+        delete activeCheckIntervals[orderId];
+        debugLog('Userbot', `⏹️ Auto-polling stopped for Order ID: ${orderId}`);
+    }
+}
+
+// --- USERBOT BRIDGE ---
+async function initUserbotBridge() {
+    if (!TELEGRAM_SESSION_STRING) return;
+    try {
+        const session = new StringSession(TELEGRAM_SESSION_STRING);
+        userbotClient = new TelegramClient(session, TELEGRAM_API_ID, TELEGRAM_API_HASH, { connectionRetries: 5 });
+        await userbotClient.connect();
+        debugLog('Userbot', '🟢 Personal Telegram Account Connected Successfully!');
+
+        userbotClient.addEventHandler(async (event) => {
+            const message = event.message;
+            if (!message || message.out) return;
+
+            const text = (message.message || '').toLowerCase();
+            const rawText = message.message || '';
+            const pendingOrders = await OrderModel.find({ status: { $in: ['Pending', 'Accepted', 'In Progress'] } });
+
+            for (let order of pendingOrders) {
+                if (rawText.includes(order.targetId) || pendingOrders.length === 1) {
+                    let customerBot = CUSTOMER_BOT_TOKENS[0] ? new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false }) : null;
+                    let adminBot = ADMIN_BOT_TOKEN ? new TelegramBot(ADMIN_BOT_TOKEN, { polling: false }) : null;
+                    const cleanedText = sanitizeCustomerMessage(rawText);
+
+                    // 1. COMPLETE / SUCCESS
+                    if (text.includes('reached successfully') || text.includes('reach successful') || text.includes('status: success') || text.includes('completed in')) {
+                        stopAutoRecheck(order._id);
+                        order.status = 'Completed';
+                        order.adminReply = cleanedText;
+                        await order.save();
+
+                        if (customerBot) {
+                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(async () => {
+                                await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`).catch(()=>{});
+                            });
+                        }
+                        if (adminBot) {
+                            await adminBot.sendMessage(ADMIN_CHAT_ID, `🎉 **Order Complete:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                        }
+                    }
+                    // 2. REJECT / FAILED / INVALID / LOCKED (Auto-Refund 1 Coin)
+                    else if (text.includes('login failed') || text.includes('invalid credentials') || text.includes('locked') || text.includes('reject') || text.includes('fail') || text.includes('error')) {
+                        stopAutoRecheck(order._id);
+                        order.status = 'Rejected';
+                        order.adminReply = cleanedText;
+                        await order.save();
+
+                        await UserModel.findOneAndUpdate({ telegramChatId: order.telegramChatId }, { $inc: { jpwCoins: 1 } });
+
+                        if (customerBot) {
+                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}\n\n🪙 *1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(async () => {
+                                await customerBot.sendMessage(order.telegramChatId, `${cleanedText}\n\n🪙 1 JPW Coin has been refunded to your wallet!`).catch(()=>{});
+                            });
+                        }
+                        if (adminBot) {
+                            await adminBot.sendMessage(ADMIN_CHAT_ID, `❌ **Order Rejected & Coin Refunded:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                        }
+                    }
+                    // 3. QUEUED (Start 2-min Auto Recheck)
+                    else if (text.includes('queued') || text.includes('queue:')) {
+                        order.status = 'In Progress';
+                        order.adminReply = cleanedText;
+                        await order.save();
+
+                        startAutoRecheck(order._id, order.targetId, order.targetPass);
+
+                        if (customerBot) {
+                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                        }
+                    }
+                    // 4. PROCESSING / STARTING (Stop 2-min Auto Recheck)
+                    else if (text.includes('processing') || text.includes('starting reach') || text.includes('still reaching')) {
+                        stopAutoRecheck(order._id);
+                        order.status = 'In Progress';
+                        order.adminReply = cleanedText;
+                        await order.save();
+
+                        if (customerBot) {
+                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                        }
+                    }
+                    // 5. Default Update
+                    else {
+                        order.adminReply = cleanedText;
+                        await order.save();
+                        if (customerBot) {
+                            await customerBot.sendMessage(order.telegramChatId, `💬 **Order Update:**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                        }
+                    }
+                    break;
+                }
+            }
+        }, new NewMessage({ incoming: true }));
+    } catch(err) {
+        debugLog('Userbot', '❌ Userbot Connection Error:', err.message);
+    }
+}
+
+// Forward to Target Bot with Error Catch & Refund
+async function forwardOrderToTargetBot(targetId, targetPass) {
+    if (!userbotClient) {
+        debugLog('Userbot', 'Userbot not ready');
+        return false;
+    }
+    try {
+        const payload = `${targetId} ${targetPass}`;
+        await userbotClient.sendMessage(TARGET_THIRD_PARTY_BOT, { message: payload });
+        debugLog('Userbot', `Sent to ${TARGET_THIRD_PARTY_BOT}: ${payload}`);
+        return true;
+    } catch(e) {
+        debugLog('Userbot', 'Failed to send to target bot:', e.message);
+        return false;
+    }
+}
 
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
     .then(async () => {
@@ -63,6 +265,7 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
             await mongoose.connection.collection('users').dropIndexes().catch(() => {});
         } catch(e) {}
         initAllBots();
+        initUserbotBridge();
         startOrderCleanupTimer();
     })
     .catch(err => debugLog('Database', '❌ DB Error:', err.message));
@@ -208,7 +411,6 @@ function startAdminBot(token) {
                 return;
             }
 
-            // 📢 Announcement Handler
             if (adminPendingBroadcast) {
                 adminPendingBroadcast = false;
                 const users = await UserModel.find({ telegramChatId: { $not: /^WEB_/ } });
@@ -227,7 +429,6 @@ function startAdminBot(token) {
                 return;
             }
 
-            // 👤 Customer Details & Order History Search Handler
             if (adminPendingCustomerDetails) {
                 adminPendingCustomerDetails = false;
                 const searchKey = text;
@@ -257,14 +458,14 @@ function startAdminBot(token) {
                 if (reachOrders.length > 0) {
                     responseMsg += `⚡ **Recent Reach Orders:**\n`;
                     reachOrders.forEach(ro => {
-                        responseMsg += `• ID: \`${ro.targetId}\` | Pass: \`${ro.targetPass}\`\n  Status: *${ro.status}*\n  Admin Reply: _${ro.adminReply || 'No reply'}\_\n  Date: ${new Date(ro.createdAt).toLocaleDateString()}\n\n`;
+                        responseMsg += `• ID: \`${ro.targetId}\` | Pass: \`${ro.targetPass}\`\n  Status: *${ro.status}*\n  Admin Reply: _${ro.adminReply || 'No reply'}_\n  Date: ${new Date(ro.createdAt).toLocaleDateString()}\n\n`;
                     });
                 }
 
                 if (srOrders.length > 0) {
                     responseMsg += `📌 **Recent SR Orders:**\n`;
                     srOrders.forEach(so => {
-                        responseMsg += `• Name: *${so.customerName}* | Mobile: \`${so.mobileNumber}\`\n  Status: *${so.status}*\n  Replies: _${so.adminReplies.length ? so.adminReplies.join(', ') : 'No reply'}\_\n  Date: ${new Date(so.createdAt).toLocaleDateString()}\n\n`;
+                        responseMsg += `• Name: *${so.customerName}* | Mobile: \`${so.mobileNumber}\`\n  Status: *${so.status}*\n  Replies: _${so.adminReplies.length ? so.adminReplies.join(', ') : 'No reply'}_\n  Date: ${new Date(so.createdAt).toLocaleDateString()}\n\n`;
                     });
                 }
 
@@ -272,7 +473,6 @@ function startAdminBot(token) {
                 return;
             }
 
-            // ✏️ Edit Order Search Handler
             if (adminPendingEditSearch) {
                 adminPendingEditSearch = false;
                 const searchId = text;
@@ -361,7 +561,6 @@ function startAdminBot(token) {
             const data = query.data;
             const messageId = query.message.message_id;
 
-            // 👤 Customer Details Trigger
             if (data === 'admin_customer_details') {
                 adminPendingCustomerDetails = true;
                 bot.answerCallbackQuery(query.id);
@@ -369,7 +568,6 @@ function startAdminBot(token) {
                 return;
             }
 
-            // 📋 History Log View
             if (data.startsWith('history_')) {
                 bot.answerCallbackQuery(query.id);
                 const [, type, id] = data.split('_');
@@ -389,7 +587,6 @@ function startAdminBot(token) {
                 return;
             }
 
-            // ✏️ Edit Order Triggers
             if (data === 'admin_edit_order') {
                 adminPendingEditSearch = true;
                 bot.answerCallbackQuery(query.id);
@@ -834,8 +1031,17 @@ app.post('/api/sr-submit', async (req, res) => {
     }
 });
 
+// AUTO FORWARD TO TARGET BOT VIA USERBOT + AUTO-POLLING + TIME BOUND (7:00 AM - 10:00 PM)
 app.post('/api/order', async (req, res) => {
     try {
+        // 1. Working Hours Check (7:00 AM - 10:00 PM IST)
+        if (!isServiceOpen()) {
+            return res.json({
+                success: false,
+                message: '⛔ हमारी सेवा का समय सुबह 7:00 AM से रात 10:00 PM तक है। कृपया निर्धारित समय के भीतर प्रयास करें।'
+            });
+        }
+
         const { telegramChatId, targetId, targetPass } = req.body;
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
 
@@ -847,7 +1053,22 @@ app.post('/api/order', async (req, res) => {
         await user.save();
 
         const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId, targetPass });
+
+        // Notify Admin
         await notifyAdminAndUser(newOrder, user, `🌐 **New Reach Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
+
+        // Forward to Target Bot
+        const sent = await forwardOrderToTargetBot(targetId, targetPass);
+
+        if (!sent) {
+            // If failed to send immediately, refund 1 coin safely
+            user.jpwCoins += 1;
+            await user.save();
+            newOrder.status = 'Rejected';
+            newOrder.adminReply = 'Target bot unreachable. Coin refunded.';
+            await newOrder.save();
+            return res.json({ success: false, message: '⚠️ बॉट से संपर्क नहीं हो सका। आपका 1 कॉइन वापस कर दिया गया है।' });
+        }
 
         res.json({ success: true, message: 'Reach order successfully submitted!', remainingCoins: user.jpwCoins });
     } catch (err) {
