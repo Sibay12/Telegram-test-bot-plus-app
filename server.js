@@ -112,13 +112,16 @@ function sanitizeCustomerMessage(rawText) {
     return sanitized.replace(/\n{3,}/g, '\n\n').trim();
 }
 
-// ⏱️ Auto-Polling Manager (2 Mins Interval, Max 10 Mins)
+// ⏱️ Auto-Polling Manager (2 Mins Interval, Locked Target ID)
 function startAutoRecheck(orderId, targetId, targetPass) {
     if (activeCheckIntervals[orderId]) return;
     let attempts = 0;
-    const maxAttempts = 5;
+    const maxAttempts = 6;
 
-    debugLog('Userbot', `⏳ Auto-polling started for ${targetId} (every 2 mins)`);
+    const lockedTargetId = String(targetId).trim();
+    const lockedTargetPass = String(targetPass).trim();
+
+    debugLog('Userbot', `⏳ Auto-polling started for Target ID: ${lockedTargetId} (every 2 mins)`);
 
     activeCheckIntervals[orderId] = setInterval(async () => {
         attempts++;
@@ -129,14 +132,8 @@ function startAutoRecheck(orderId, targetId, targetPass) {
                 return;
             }
 
-            if (attempts >= maxAttempts) {
-                debugLog('Userbot', `⏹️ Max 10 mins reached for ${targetId}. Stopping auto-polling.`);
-                stopAutoRecheck(orderId);
-                return;
-            }
-
-            await forwardOrderToTargetBot(targetId, targetPass);
-            debugLog('Userbot', `🔄 Auto-recheck sent (${attempts}/${maxAttempts}) for ${targetId}`);
+            await forwardOrderToTargetBot(lockedTargetId, lockedTargetPass);
+            debugLog('Userbot', `🔄 Auto-recheck sent (${attempts}/${maxAttempts}) for Target ID: ${lockedTargetId}`);
         } catch (e) {
             debugLog('Userbot', `❌ Auto-recheck error: ${e.message}`);
         }
@@ -184,21 +181,21 @@ async function initUserbotBridge() {
                     let customerBot = CUSTOMER_BOT_TOKENS[0] ? new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false }) : null;
                     let adminBot = ADMIN_BOT_TOKEN ? new TelegramBot(ADMIN_BOT_TOKEN, { polling: false }) : null;
 
-                    // 1. REAL COMPLETE (केवल तब जब 'Status: SUCCESS' या 'Reached successfully' बिना 'completed in' के हो)
+                    // 1. REAL COMPLETE
                     if (text.includes('status: success') || (text.includes('reached successfully') && !text.includes('completed in'))) {
                         stopAutoRecheck(order._id);
                         order.status = 'Completed';
                         await order.save();
 
                         if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            await customerBot.sendMessage(order.telegramChatId, `🎉 **Your order has been successfully closed!**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                         if (adminBot) {
                             await adminBot.sendMessage(ADMIN_CHAT_ID, `🎉 **Order Complete:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
-                    // 2. REJECT / FAILED / INVALID / LOCKED (Auto-Refund 1 Coin)
-                    else if (text.includes('login failed') || text.includes('invalid credentials') || text.includes('locked') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
+                    // 2. REJECT / FAILED / LOCKED / ALERT LS (Auto-Refund 1 Coin)
+                    else if (text.includes('locked') || text.includes('alert ls') || text.includes('login failed') || text.includes('invalid credentials') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
                         stopAutoRecheck(order._id);
                         order.status = 'Rejected';
                         await order.save();
@@ -206,13 +203,13 @@ async function initUserbotBridge() {
                         await UserModel.findOneAndUpdate({ telegramChatId: order.telegramChatId }, { $inc: { jpwCoins: 1 } });
 
                         if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}\n\n🪙 *1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}\n\n🪙 *Order Closed / Locked! 1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                         if (adminBot) {
                             await adminBot.sendMessage(ADMIN_CHAT_ID, `❌ **Order Rejected & Coin Refunded:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
-                    // 3. COMPLETING SOON / IN PROGRESS (जैसे 'Completed in 61s', 'queued', 'processing')
+                    // 3. IN PROGRESS / COMPLETING SOON
                     else if (text.includes('completed in') || text.includes('queued') || text.includes('queue:') || text.includes('processing') || text.includes('starting reach') || text.includes('still reaching')) {
                         order.status = 'In Progress';
                         await order.save();
@@ -800,7 +797,7 @@ function startAdminBot(token) {
     } catch(e) {}
 }
 
-// 🤖 Customer Bot Management
+// 🤖 Customer Bot Management (Updated with Direct Chat Order & Target Lock Support)
 function startCustomerBot(token, isPrimary) {
     try {
         const bot = new TelegramBot(token, { polling: true });
@@ -840,6 +837,57 @@ function startCustomerBot(token, isPrimary) {
                 };
 
                 await bot.sendMessage(chatId, `✨ **Welcome to JPW Engineer Portal Bot!** 🚀\n\n👤 Engineer: *${user.name}*\n🆔 Chat ID: \`${chatId}\`\n🪙 Coins Balance: *${user.jpwCoins.toFixed(2)} Coins*\n\n👇 *Choose an option:*`, { parse_mode: 'Markdown', ...keyboard });
+                return;
+            }
+
+            // 🎯 DIRECT CHAT ORDER PARSER (Direct ID & Password typing support)
+            const parts = text.split(/\s+/);
+            if (parts.length === 2 && !text.startsWith('/')) {
+                const targetId = parts[0].trim();
+                const targetPass = parts[1].trim();
+
+                if (!isServiceOpen()) {
+                    await bot.sendMessage(chatId, '⛔ हमारी सेवा का समय सुबह 7:00 AM से रात 10:00 PM तक है। कृपया निर्धारित समय के भीतर प्रयास करें।');
+                    return;
+                }
+
+                // Target Specific Lock Check
+                const existingTargetActiveOrder = await OrderModel.findOne({ 
+                    targetId: targetId, 
+                    status: { $in: ['Pending', 'Accepted', 'In Progress'] } 
+                });
+
+                if (existingTargetActiveOrder) {
+                    await bot.sendMessage(chatId, `⚠️ Stop! यह Target ID (${targetId}) अभी पहले से प्रोसेस में है। जब तक यह पूरी तरह कम्प्लीट या क्लोज नहीं होती, आप इस पर दोबारा ऑर्डर नहीं लगा सकते। (लेकिन आप दूसरी नई ID से ऑर्डर भेज सकते हैं!)`);
+                    return;
+                }
+
+                let user = await UserModel.findOne({ telegramChatId: chatId });
+                if (!user || user.jpwCoins < 1) {
+                    await bot.sendMessage(chatId, '❌ Insufficient JPW Coins! Your balance is low. 1 JPW Coin required to place an order.');
+                    return;
+                }
+
+                user.jpwCoins -= 1;
+                await user.save();
+
+                const newOrder = await OrderModel.create({ telegramChatId: chatId, targetId, targetPass });
+
+                await notifyAdminAndUser(newOrder, user, `🌐 **New Direct Chat Order (Pending)**\n💬 Chat ID: \`${chatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
+
+                const sent = await forwardOrderToTargetBot(targetId, targetPass);
+
+                if (!sent) {
+                    user.jpwCoins += 1;
+                    await user.save();
+                    newOrder.status = 'Rejected';
+                    newOrder.adminReply = 'Target bot unreachable. Coin refunded.';
+                    await newOrder.save();
+                    await bot.sendMessage(chatId, '⚠️ बॉट से संपर्क नहीं हो सका। आपका 1 कॉइन वापस कर दिया गया है।');
+                    return;
+                }
+
+                await bot.sendMessage(chatId, `✅ **Order Placed Successfully via Direct Chat!**\n🎯 Target ID: \`${targetId}\`\n🪙 Remaining Coins: *${user.jpwCoins.toFixed(2)}*\n\n⏳ Processing your reach now... We'll notify you once it's done.`, { parse_mode: 'Markdown' });
                 return;
             }
         });
@@ -1031,7 +1079,7 @@ app.post('/api/sr-submit', async (req, res) => {
     }
 });
 
-// AUTO FORWARD TO TARGET BOT VIA USERBOT + AUTO-POLLING + TIME BOUND (7:00 AM - 10:00 PM IST)
+// AUTO FORWARD TO TARGET BOT VIA USERBOT + AUTO-POLLING + TIME BOUND (7:00 AM - 10:00 PM IST) + TARGET-SPECIFIC LOCK
 app.post('/api/order', async (req, res) => {
     try {
         // 1. Working Hours Check (7:00 AM - 10:00 PM IST)
@@ -1043,6 +1091,26 @@ app.post('/api/order', async (req, res) => {
         }
 
         const { telegramChatId, targetId, targetPass } = req.body;
+        
+        if (!telegramChatId || !targetId || !targetPass) {
+            return res.json({ success: false, message: '⚠️ All fields are required!' });
+        }
+
+        const trimmedTargetId = String(targetId).trim();
+
+        // 🛡️ Target Specific Active Order Lock Check
+        const existingTargetActiveOrder = await OrderModel.findOne({ 
+            targetId: trimmedTargetId, 
+            status: { $in: ['Pending', 'Accepted', 'In Progress'] } 
+        });
+
+        if (existingTargetActiveOrder) {
+            return res.json({ 
+                success: false, 
+                message: `⚠️ Stop! यह Target ID (${trimmedTargetId}) अभी पहले से प्रोसेस में है। जब तक यह पूरी तरह कम्प्लीट या क्लोज नहीं होती, आप इस पर दोबारा ऑर्डर नहीं लगा सकते। (लेकिन आप दूसरी नई ID से ऑर्डर लगा सकते हैं!)` 
+            });
+        }
+
         let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
 
         if (!user || user.jpwCoins < 1) {
@@ -1052,13 +1120,13 @@ app.post('/api/order', async (req, res) => {
         user.jpwCoins -= 1;
         await user.save();
 
-        const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId, targetPass });
+        const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId: trimmedTargetId, targetPass: targetPass.trim() });
 
         // Notify Admin
-        await notifyAdminAndUser(newOrder, user, `🌐 **New Reach Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
+        await notifyAdminAndUser(newOrder, user, `🌐 **New Reach Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${trimmedTargetId}\`\n🔑 Pass: \`${targetPass}\``);
 
         // Forward to Target Bot
-        const sent = await forwardOrderToTargetBot(targetId, targetPass);
+        const sent = await forwardOrderToTargetBot(trimmedTargetId, targetPass);
 
         if (!sent) {
             user.jpwCoins += 1;
