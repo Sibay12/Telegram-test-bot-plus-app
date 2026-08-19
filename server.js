@@ -675,7 +675,6 @@ app.post('/api/verify-otp', async (req, res) => {
         let { telegramChatId, otp } = req.body;
         telegramChatId = String(telegramChatId).trim();
         
-        // If OTP is provided, validate it, otherwise allow direct token login verification
         if (otp) {
             const record = otpStorage[telegramChatId];
             if (!record || record.expires < Date.now() || record.otp !== String(otp).trim()) {
@@ -716,6 +715,90 @@ app.post('/api/reseller/orders-status', async (req, res) => {
 // 📦 RECHARGE PACKAGES API
 app.get('/api/packages', (req, res) => {
     res.json({ success: true, packages: RECHARGE_PACKAGES });
+});
+
+// 💳 CASHFREE PAYMENT INTEGRATION API (Fixed & Restored)
+app.post('/api/pay', async (req, res) => {
+    try {
+        const { telegramChatId, amount, coins } = req.body;
+        let orderId = `JPW_${Date.now()}_${telegramChatId}`;
+
+        let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
+        if (user) {
+            user.activePackage = `₹${amount} (${coins} JPW Coins)`;
+            await user.save();
+        }
+
+        const postData = JSON.stringify({
+            order_id: orderId,
+            order_amount: parseFloat(amount),
+            order_currency: "INR",
+            customer_details: { 
+                customer_id: String(telegramChatId), 
+                customer_phone: "9999999999", 
+                customer_email: "test@jpw.com",
+                customer_name: user ? user.name : "Engineer"
+            },
+            order_meta: { 
+                return_url: `https://cashtree.space/?payment=success&telegramChatId=${telegramChatId}&coins=${coins}&order_id=${orderId}` 
+            }
+        });
+
+        const options = {
+            hostname: 'api.cashfree.com',
+            path: '/pg/orders',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-client-id': CASHFREE_CLIENT_ID,
+                'x-client-secret': CASHFREE_CLIENT_SECRET,
+                'x-api-version': '2022-09-01'
+            }
+        };
+
+        const reqCashfree = https.request(options, (response) => {
+            let body = '';
+            response.on('data', chunk => body += chunk);
+            response.on('end', () => {
+                try {
+                    const json = JSON.parse(body);
+                    if (response.statusCode === 200 && json.payment_session_id) {
+                        res.json({ success: true, paymentSessionId: json.payment_session_id, orderId });
+                    } else {
+                        res.json({ success: false, message: json.message || 'Cashfree API Error' });
+                    }
+                } catch(e) { 
+                    res.status(500).json({ success: false, message: 'JSON Parse Error from Cashfree' }); 
+                }
+            });
+        });
+
+        reqCashfree.on('error', (err) => { 
+            res.status(500).json({ success: false, message: err.message }); 
+        });
+        
+        reqCashfree.write(postData);
+        reqCashfree.end();
+    } catch(err) { 
+        res.status(500).json({ success: false, error: err.message }); 
+    }
+});
+
+app.post('/api/verify-instant', async (req, res) => {
+    try {
+        const { telegramChatId, coins, order_id } = req.body;
+        const transactionId = order_id || `INSTANT_${Date.now()}_${telegramChatId}`;
+        const existingUtr = await UsedUtrModel.findOne({ utrId: transactionId });
+        if (existingUtr) return res.json({ success: false, message: 'Already credited' });
+
+        let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
+        if (user) {
+            await UsedUtrModel.create({ utrId: transactionId });
+            user.jpwCoins += parseFloat(coins);
+            await user.save();
+            res.json({ success: true, user });
+        } else { res.json({ success: false, message: 'User not found' }); }
+    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 app.post('/api/order', async (req, res) => {
