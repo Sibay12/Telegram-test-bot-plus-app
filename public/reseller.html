@@ -93,7 +93,7 @@
     let currentOrdersData = { completed: [], inProgress: [], failed: [] };
     let activeTab = 'completed';
     const ADMIN_WA = '919382856020';
-    const ADMIN_UPI = 'paytmqr281005050101111649980209@paytm';
+    const ADMIN_UPI = 'Paytm.s2ujlw0@pty';
 
     if(activeChatId) loadDash(activeChatId);
 
@@ -184,7 +184,8 @@
     function openModal(coins, amount) {
         document.getElementById('modalCoins').innerText = coins;
         document.getElementById('modalAmount').innerText = amount;
-        document.getElementById('upiQrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${ADMIN_UPI}&pn=JPW&am=${amount}&cu=INR`)}`;
+        const upiString = `upi://pay?pa=${ADMIN_UPI}&pn=JPW%20Reseller%20Hub&am=${amount}&cu=INR`;
+        document.getElementById('upiQrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
         document.getElementById('waDirectBtn').href = `https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(`Reseller Payment: ${coins} Coins for ₹${amount} (ID: ${activeChatId})`)}`;
         document.getElementById('paymentModal').classList.remove('hidden');
     }
