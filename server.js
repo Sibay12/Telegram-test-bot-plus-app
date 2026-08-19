@@ -148,6 +148,60 @@ function stopAutoRecheck(orderId) {
     }
 }
 
+// --- SMART TIMED GREETINGS SYSTEM (Every 40 Mins based on Time & Mood) ---
+function startSmartGreetingsTimer() {
+    // हर 40 मिनट (40 * 60 * 1000 ms) बाद ट्रिगर होगा
+    setInterval(async () => {
+        try {
+            const users = await UserModel.find({ telegramChatId: { $not: /^WEB_/ } });
+            if (users.length === 0 || !CUSTOMER_BOT_TOKENS[0]) return;
+
+            const tempBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
+            const istHour = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getHours();
+
+            let greetingOptions = [];
+
+            if (istHour >= 6 && istHour < 11) {
+                greetingOptions = [
+                    "🌅 **Good Morning, Engineer!**\n\nHope you had a great sleep. Don't forget to grab your breakfast and coffee before starting today's tech tasks! Have a productive day ahead. ☕🚀",
+                    "☀️ **Good Morning!**\n\nSubah ka waqt fresh energy ka hota hai. Naashta (Breakfast) kar lijiye aur taiyar ho jaiye aaj ke naye orders ke liye. Have a wonderful day! 🥐",
+                    "🌅 **Morning Alert!**\n\nHope you're energized and ready. Morning tea ya coffee ke sath JPW Portal pe apne orders execute karna shuru karein. Best of luck! ☕"
+                ];
+            } else if (istHour >= 11 && istHour < 16) {
+                greetingOptions = [
+                    "☀️ **Good Afternoon, Engineer!**\n\nDoophoor ka waqt ho gaya hai. Thoda break lijiye, lunch kar lijiye (Khana kha lijiye), aur hydrate rahiye! 🥗🍽️",
+                    "🍽️ **Lunch Time Reminder!**\n\nKaam ke beech mein lunch karna mat bhooliyega. Pet pooja zaroori hai! Khana khane ke baad fresh ho kar wapas aayein. Bon appétit! 🍛",
+                    "⚡ **Afternoon Check-in!**\n\nHope your day is going smoothly. Agar koi target reach mein dikkat aaye toh WhatsApp support par contact karein. Keep rocking! 🔥"
+                ];
+            } else if (istHour >= 16 && istHour < 20) {
+                greetingOptions = [
+                    "🌆 **Good Evening, Engineer!**\n\nShaam ki chai (Evening Tea) ka waqt ho chuka hai. Ek cup chai ya coffee pijiye aur relax hokar baaki ke tasks pure kijiye! ☕",
+                    "🌇 **Evening Vibes!**\n\nDin ka kafi kaam ho chuka hai. Thoda break lijiye, snacks enjoy kijiye, aur sham ke orders ko smoothly complete karein. 🍪",
+                    "⚡ **Evening Status Update!**\n\nHope everything is on track with your reaches. Need any assistance? Feel free to reach out to support. Have a great evening! ✨"
+                ];
+            } else {
+                greetingOptions = [
+                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam ke baad ab aaram kijiye (Good night & sleep well)! 🌌",
+                    "🌙 **Late Night Check!**\n\nService hours close hone wale hain ya band hain. Apni health ka dhyan rakhein aur achhi neend lein taaki subah fresh uth sakein. Good night! 😴",
+                    "⭐ **Nighttime Reminder!**\n\nGreat job today! Apne system band karein, relax karein aur kal ek nayi energy ke sath milte hain. Good night and sweet dreams! 🌠"
+                ];
+            }
+
+            // रैंडम ग्रीटिंग चुनना ताकि हर 40 मिनट पर अलग मैसेज जाए
+            const randomMsg = greetingOptions[Math.floor(Math.random() * greetingOptions.length)];
+
+            for (let u of users) {
+                try {
+                    await tempBot.sendMessage(u.telegramChatId, randomMsg, { parse_mode: 'Markdown' });
+                } catch (err) {}
+            }
+            debugLog('Greetings', '✨ Smart timed greetings broadcast sent successfully.');
+        } catch (e) {
+            debugLog('Greetings', `❌ Error in greetings timer: ${e.message}`);
+        }
+    }, 40 * 60 * 1000); // 40 minutes interval
+}
+
 // --- USERBOT BRIDGE ---
 async function initUserbotBridge() {
     if (!TELEGRAM_SESSION_STRING) return;
@@ -157,12 +211,11 @@ async function initUserbotBridge() {
         await userbotClient.connect();
         debugLog('Userbot', '🟢 Personal Telegram Account Connected Successfully!');
 
-        userbotClient.addEventHandler(async (event) => {
-            const message = event.message;
+        const handleBotMessage = async (message) => {
             if (!message || message.out) return;
 
-            const text = (message.message || '').toLowerCase();
             const rawText = message.message || '';
+            const text = rawText.toLowerCase();
             const pendingOrders = await OrderModel.find({ status: { $in: ['Pending', 'Accepted', 'In Progress'] } });
 
             for (let order of pendingOrders) {
@@ -171,6 +224,7 @@ async function initUserbotBridge() {
                 }
 
                 if (rawText.includes(order.targetId) || pendingOrders.length === 1) {
+                    
                     const cleanedText = sanitizeCustomerMessage(rawText);
 
                     if (order.adminReply === cleanedText) {
@@ -181,7 +235,7 @@ async function initUserbotBridge() {
                     let customerBot = CUSTOMER_BOT_TOKENS[0] ? new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false }) : null;
                     let adminBot = ADMIN_BOT_TOKEN ? new TelegramBot(ADMIN_BOT_TOKEN, { polling: false }) : null;
 
-                    // 1. REAL COMPLETE
+                    // 1. REAL COMPLETE (Success)
                     if (text.includes('status: success') || (text.includes('reached successfully') && !text.includes('completed in'))) {
                         stopAutoRecheck(order._id);
                         order.status = 'Completed';
@@ -218,12 +272,15 @@ async function initUserbotBridge() {
                             startAutoRecheck(order._id, order.targetId, order.targetPass);
                         }
 
-                        if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `⏳ **Order Progress Update:**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                        if (!text.includes('security check') && !text.includes('connecting')) {
+                            if (customerBot) {
+                                await customerBot.sendMessage(order.telegramChatId, `⏳ **Order Progress:**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            }
                         }
                     }
                     // 4. Default Update
                     else {
+                        order.status = 'In Progress';
                         await order.save();
                         if (customerBot) {
                             await customerBot.sendMessage(order.telegramChatId, `💬 **Order Update:**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
@@ -232,7 +289,16 @@ async function initUserbotBridge() {
                     break;
                 }
             }
+        };
+
+        userbotClient.addEventHandler(async (event) => {
+            await handleBotMessage(event.message);
         }, new NewMessage({ incoming: true }));
+
+        userbotClient.addEventHandler(async (event) => {
+            await handleBotMessage(event.message);
+        }, new (require("telegram/events").EditedMessage)({ incoming: true }));
+
     } catch(err) {
         debugLog('Userbot', '❌ Userbot Connection Error:', err.message);
     }
@@ -264,6 +330,7 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
         initAllBots();
         initUserbotBridge();
         startOrderCleanupTimer();
+        startSmartGreetingsTimer(); // ⏰ हर 40 मिनट वाला ग्रीटिंग्स टाइमर शुरू किया गया
     })
     .catch(err => debugLog('Database', '❌ DB Error:', err.message));
 
@@ -797,7 +864,7 @@ function startAdminBot(token) {
     } catch(e) {}
 }
 
-// 🤖 Customer Bot Management
+// 🤖 Customer Bot Management (Updated with WhatsApp Support Button)
 function startCustomerBot(token, isPrimary) {
     try {
         const bot = new TelegramBot(token, { polling: true });
