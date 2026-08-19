@@ -3,393 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPW Cyber-Tech Portal v3.6</title>
+    <title>JPW Engineer Portal - Mobile App</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
-        body { 
-            background: #020617; 
-            color: #38bdf8; 
-            font-family: 'JetBrains Mono', monospace; 
-            background-image: radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%);
-        }
-        .tech-glass { 
-            background: rgba(15, 23, 42, 0.90); 
-            backdrop-filter: blur(16px); 
-            border: 1px solid rgba(56, 189, 248, 0.2); 
-            box-shadow: 0 0 25px rgba(56, 189, 248, 0.1);
-        }
-        .tech-glow { box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
-        .tech-glow-emerald { box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
-        input:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.4); }
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Segoe+UI:wght@400;600;800&display=swap');
+        body { background: #030712; color: #f8fafc; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+        .glass { background: rgba(17, 24, 39, 0.9); backdrop-filter: blur(15px); border: 1px solid rgba(56, 189, 248, 0.3); }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body class="p-4 flex items-center justify-center min-h-screen">
-
-<div class="w-full max-w-md tech-glass p-6 rounded-3xl relative overflow-hidden">
-    <!-- Top Tech Accent Bar -->
-    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500"></div>
-
-    <div class="text-center mb-5">
-        <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-300 tracking-wider">JPW // PORTAL</h2>
-        <p class="text-[10px] text-slate-400 mt-1 uppercase tracking-widest">[ Secure Engineer Node ]</p>
+<div class="w-full max-w-lg glass p-6 rounded-3xl relative space-y-4">
+    <div class="text-center mb-3">
+        <h1 class="text-xl font-black text-sky-400 mono">JPW ENGINEER PORTAL</h1>
+        <p class="text-xs text-slate-400">Live Status & Management</p>
     </div>
 
-    <!-- Auth Container (Login / Register) -->
-    <div id="auth-container">
-        <div class="flex gap-2 mb-4 bg-slate-950 p-1 rounded-2xl border border-slate-800">
-            <button onclick="switchTab('login')" id="tabL" class="flex-1 py-2.5 rounded-xl font-bold text-xs bg-sky-500 text-slate-950 transition tech-glow">LOGIN</button>
-            <button onclick="switchTab('register')" id="tabR" class="flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-400 transition">REGISTER</button>
+    <!-- User Info Box -->
+    <div class="p-4 rounded-xl bg-slate-950 border border-sky-500/30 flex justify-between items-center">
+        <div>
+            <h3 id="userName" class="font-bold text-sm text-sky-300">Engineer</h3>
+            <p id="userChatId" class="text-[10px] text-slate-500 mono"></p>
         </div>
-        
-        <!-- Login Form -->
-        <div id="loginForm">
-            <div class="mb-3">
-                <label class="block text-[10px] text-cyan-400 mb-1 uppercase tracking-wider">Custom ID (10-Digit)</label>
-                <input type="text" id="logId" placeholder="ENTER ID" class="w-full p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-cyan-300">
-            </div>
-            <div class="mb-4">
-                <label class="block text-[10px] text-cyan-400 mb-1 uppercase tracking-wider">Access Password</label>
-                <input type="password" id="logPass" placeholder="••••••••" class="w-full p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-cyan-300">
-            </div>
-            <button onclick="appLogin()" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-sky-600 hover:from-cyan-400 hover:to-sky-500 text-slate-950 font-extrabold rounded-xl tech-glow transition text-xs tracking-wider">INITIALIZE LOGIN</button>
-        </div>
-
-        <!-- Register Form -->
-        <div id="regForm" class="hidden">
-            <div class="mb-3">
-                <label class="block text-[10px] text-emerald-400 mb-1 uppercase tracking-wider">Engineer Name</label>
-                <input type="text" id="regName" placeholder="FULL NAME" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-emerald-300">
-            </div>
-            <div class="mb-3">
-                <label class="block text-[10px] text-emerald-400 mb-1 uppercase tracking-wider">Choose 10-Digit ID</label>
-                <input type="text" id="regId" placeholder="UNIQUE ID" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-emerald-300">
-            </div>
-            <div class="mb-4">
-                <label class="block text-[10px] text-emerald-400 mb-1 uppercase tracking-wider">Security Password</label>
-                <input type="password" id="regPass" placeholder="••••••••" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-emerald-300">
-            </div>
-            <button onclick="appRegister()" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-extrabold rounded-xl tech-glow-emerald transition text-xs tracking-wider">REGISTER NODE</button>
+        <div class="text-right">
+            <p class="text-[10px] text-slate-400">Balance</p>
+            <h2 class="text-lg font-black text-amber-400"><span id="userCoins">0</span> Coins</h2>
         </div>
     </div>
 
-    <!-- Dashboard (After Login) -->
-    <div id="app-dashboard" class="hidden">
-        <!-- User Info & Balance Box -->
-        <div class="mb-4 p-4 bg-slate-950/80 rounded-2xl border border-sky-500/30 text-center relative">
-            <div class="absolute top-2 right-3 flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="text-[9px] text-emerald-400">ONLINE</span>
-            </div>
-            <p class="text-[10px] text-slate-400">NODE USER</p>
-            <p id="dName" class="text-sm font-black text-cyan-300 mt-0.5"></p>
-            <p class="text-xs font-bold text-amber-400 mt-1 bg-amber-500/10 py-1 px-3 rounded-full inline-block border border-amber-500/20">🪙 COINS: <span id="dCoins">0.00</span></p>
-            
-            <!-- Navigation Action Tabs -->
-            <div class="grid grid-cols-4 gap-1.5 mt-3">
-                <button onclick="switchSubTab('services')" id="btnS" class="py-2 bg-sky-500 text-slate-950 rounded-lg text-[10px] font-bold transition">SERVICES</button>
-                <button onclick="switchSubTab('packages')" id="btnP" class="py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition">PACKAGES</button>
-                <button onclick="switchSubTab('bonus')" id="btnB" class="py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition">BONUS</button>
-                <button onclick="switchSubTab('status')" id="btnT" class="py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition">STATUS</button>
-            </div>
+    <!-- Action Buttons -->
+    <div class="grid grid-cols-2 gap-2">
+        <button onclick="checkOrderStatus()" class="py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs">🔄 Sync Status</button>
+        <button onclick="claimBonus()" class="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs">🎁 Daily Bonus</button>
+    </div>
 
-            <div class="flex gap-2 mt-3">
-                <a href="https://chat.whatsapp.com/DEWvYKtdJAaAlHghem3puj?s=cl&p=a&ilr=4" target="_blank" class="w-full py-2 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center justify-center transition">💬 JOIN WHATSAPP GROUP</a>
-            </div>
-            <button onclick="logout()" class="mt-2 text-[10px] text-red-400 hover:underline uppercase tracking-wider">Disconnect Session</button>
+    <!-- Order Status Section -->
+    <div class="space-y-2">
+        <h4 class="text-xs font-bold text-slate-300 uppercase">📋 Live Orders & Sync History</h4>
+        <div id="statusBox" class="max-h-60 overflow-y-auto space-y-2 pr-1">
+            <p class="text-center text-xs text-slate-500 py-4">Click 'Sync Status' to load orders.</p>
         </div>
+    </div>
 
-        <!-- 1. SERVICES TAB -->
-        <div id="tabServices" class="space-y-3 mb-2">
-            <div class="p-3.5 bg-slate-950 rounded-2xl border border-sky-500/30">
-                <h3 class="text-xs font-bold text-sky-400 uppercase mb-1">⚡ SUBMIT REACH ORDER (1 Coin)</h3>
-                <p class="text-[10px] text-amber-400 font-bold mb-2">🕒 Service Hours: 7:00 AM to 10:00 PM IST</p>
-                <input type="text" id="targetId" placeholder="Target ID" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-cyan-300">
-                <input type="password" id="targetPass" placeholder="Target Password" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-cyan-300">
-                <button onclick="submitReachOrder()" class="w-full py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-xs font-bold text-slate-950">EXECUTE REACH ORDER</button>
-            </div>
-
-            <div class="p-3.5 bg-slate-950 rounded-2xl border border-indigo-500/30">
-                <h3 class="text-xs font-bold text-indigo-400 uppercase mb-2">📌 SUBMIT SR SERVICE (1 Coin)</h3>
-                <input type="text" id="srName" placeholder="Customer Name" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-indigo-300">
-                <input type="text" id="srMobile" placeholder="Mobile Number" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-indigo-300">
-                <input type="text" id="srLandline" placeholder="Landline Number" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-indigo-300">
-                <button onclick="submitSrOrder()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-bold text-slate-950">EXECUTE SR ORDER</button>
-            </div>
-        </div>
-
-        <!-- 2. PACKAGES TAB -->
-        <div id="tabPackages" class="hidden space-y-2 mb-2">
-            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
-                <div><span class="font-bold text-purple-400">1 Coin</span><p class="text-[10px] text-slate-400">Price: ₹13</p></div>
-                <button onclick="initiatePayment(13, 1)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
-            </div>
-            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
-                <div><span class="font-bold text-purple-400">5 Coins</span><p class="text-[10px] text-slate-400">Price: ₹60</p></div>
-                <button onclick="initiatePayment(60, 5)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
-            </div>
-            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
-                <div><span class="font-bold text-purple-400">10 Coins</span><p class="text-[10px] text-slate-400">Price: ₹115</p></div>
-                <button onclick="initiatePayment(115, 10)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
-            </div>
-            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
-                <div><span class="font-bold text-purple-400">20 Coins</span><p class="text-[10px] text-slate-400">Price: ₹210</p></div>
-                <button onclick="initiatePayment(210, 20)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
-            </div>
-            <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 flex justify-between items-center text-xs">
-                <div><span class="font-bold text-purple-400">40 Coins</span><p class="text-[10px] text-slate-400">Price: ₹400</p></div>
-                <button onclick="initiatePayment(400, 40)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold">BUY</button>
-            </div>
-        </div>
-
-        <!-- 3. BONUS TAB -->
-        <div id="tabBonus" class="hidden p-4 bg-slate-950 rounded-2xl border border-emerald-500/30 text-center mb-2">
-            <h3 class="text-sm font-bold text-emerald-400 mb-1">🎁 DAILY REWARD BONUS</h3>
-            <p class="text-[11px] text-slate-400 mb-4">Claim free random coins once every 24 hours.</p>
-            <button onclick="claimBonus()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs">CLAIM DAILY BONUS</button>
-        </div>
-
-        <!-- 4. STATUS TRACKER TAB -->
-        <div id="tabStatus" class="hidden mb-2">
-            <div class="flex justify-between items-center mb-2">
-                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LIVE ORDER TRACKER</h3>
-                <button onclick="fetchStatus()" class="text-[10px] text-sky-400 underline">🔄 Refresh</button>
-            </div>
-            <div id="statusList" class="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
-                <!-- Records load here -->
-            </div>
-        </div>
+    <div class="text-center pt-2">
+        <a href="/" class="text-xs text-sky-400 underline">⬅️ Back to Home</a>
     </div>
 </div>
 
 <script>
-    let currentUser = null;
-    const cashfree = Cashfree({ mode: "production" });
+    let activeChatId = localStorage.getItem('jpw_chat_id') || '';
 
-    window.onload = async () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentStatus = urlParams.get('payment');
-        const tgId = urlParams.get('telegramChatId');
-        const coinsToAdd = urlParams.get('coins');
-        const orderId = urlParams.get('order_id');
+    if(activeChatId) {
+        loadMiniAppAuth(activeChatId);
+    } else {
+        document.getElementById('userName').innerText = 'Guest Engineer';
+        document.getElementById('userChatId').innerText = 'Please login via Bot';
+    }
 
-        if(paymentStatus === 'success' && tgId && coinsToAdd) {
-            await verifyInstantPayment(tgId, coinsToAdd, orderId);
-        }
-
-        const savedId = localStorage.getItem('cid');
-        const savedPass = localStorage.getItem('cpass');
-        if(savedId && savedPass) {
-            try {
-                const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ customId: savedId, password: savedPass }) });
-                const data = await res.json();
-                if(data.success) {
-                    currentUser = data.user;
-                    showDash(currentUser);
-                }
-            } catch(e) {}
-        }
-    };
-
-    async function verifyInstantPayment(telegramChatId, coins, orderId) {
+    async function loadMiniAppAuth(chatId) {
         try {
-            const res = await fetch('/api/verify-instant', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId, coins, order_id: orderId }) });
+            const res = await fetch('/api/mini-app/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramChatId: chatId })
+            });
             const data = await res.json();
             if(data.success) {
-                alert(`🎉 Payment Successful! Added ${coins} JPW Coins to your account.`);
-                window.history.replaceState({}, document.title, window.location.pathname);
+                document.getElementById('userName').innerText = data.user.name;
+                document.getElementById('userChatId').innerText = `ID: ${data.user.telegramChatId}`;
+                document.getElementById('userCoins').innerText = data.user.jpwCoins.toFixed(2);
+                checkOrderStatus();
             }
         } catch(e) {}
     }
 
-    function switchTab(t) {
-        document.getElementById('loginForm').classList.toggle('hidden', t !== 'login');
-        document.getElementById('regForm').classList.toggle('hidden', t !== 'register');
-        document.getElementById('tabL').className = t === 'login' ? 'flex-1 py-2.5 rounded-xl font-bold text-xs bg-sky-500 text-slate-950 transition tech-glow' : 'flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-400 transition';
-        document.getElementById('tabR').className = t === 'register' ? 'flex-1 py-2.5 rounded-xl font-bold text-xs bg-emerald-500 text-slate-950 transition tech-glow-emerald' : 'flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-400 transition';
-    }
-
-    function switchSubTab(sub) {
-        document.getElementById('tabServices').classList.add('hidden');
-        document.getElementById('tabPackages').classList.add('hidden');
-        document.getElementById('tabBonus').classList.add('hidden');
-        document.getElementById('tabStatus').classList.add('hidden');
-
-        document.getElementById('btnS').className = 'py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition';
-        document.getElementById('btnP').className = 'py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition';
-        document.getElementById('btnB').className = 'py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition';
-        document.getElementById('btnT').className = 'py-2 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg text-[10px] font-bold transition';
-
-        if(sub === 'services') {
-            document.getElementById('tabServices').classList.remove('hidden');
-            document.getElementById('btnS').className = 'py-2 bg-sky-500 text-slate-950 rounded-lg text-[10px] font-bold transition';
-        } else if(sub === 'packages') {
-            document.getElementById('tabPackages').classList.remove('hidden');
-            document.getElementById('btnP').className = 'py-2 bg-purple-500 text-slate-950 rounded-lg text-[10px] font-bold transition';
-        } else if(sub === 'bonus') {
-            document.getElementById('tabBonus').classList.remove('hidden');
-            document.getElementById('btnB').className = 'py-2 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-bold transition';
-        } else if(sub === 'status') {
-            document.getElementById('tabStatus').classList.remove('hidden');
-            document.getElementById('btnT').className = 'py-2 bg-indigo-500 text-slate-950 rounded-lg text-[10px] font-bold transition';
-            fetchStatus();
+    // 🛠️ Fixed Check Order Status with correct backend endpoint & zero sync error
+    async function checkOrderStatus() {
+        const telegramChatId = localStorage.getItem('jpw_chat_id');
+        if (!telegramChatId) {
+            document.getElementById('statusBox').innerHTML = `<p class="text-xs text-rose-400 text-center">Session not found. Please open via Telegram Bot.</p>`;
+            return;
         }
-    }
 
-    async function appLogin() {
-        const customId = document.getElementById('logId').value.trim();
-        const password = document.getElementById('logPass').value.trim();
-        if(!customId || !password) return alert('Please enter ID and Password!');
+        document.getElementById('statusBox').innerHTML = `<p class="text-xs text-sky-400 text-center py-2">Syncing orders...</p>`;
 
-        const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ customId, password }) });
-        const data = await res.json();
-        
-        if(data.success) {
-            localStorage.setItem('cid', data.user.customId);
-            localStorage.setItem('cpass', password);
-            localStorage.setItem('chatid', data.user.telegramChatId);
-            currentUser = data.user;
-            showDash(currentUser);
-        } else {
-            alert(data.message || 'Login failed!');
+        try {
+            const res = await fetch('/api/app/check-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramChatId })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                let html = '';
+                
+                // Render Regular Reach Orders
+                if (data.regularOrders && data.regularOrders.length > 0) {
+                    data.regularOrders.forEach(o => {
+                        const statusColor = o.status === 'Completed' ? 'text-emerald-400 bg-emerald-500/10' : 
+                                            o.status === 'Rejected' ? 'text-rose-400 bg-rose-500/10' : 'text-amber-400 bg-amber-500/10';
+                        html += `
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-cyan-300">🎯 ID: ${o.targetId}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${statusColor}">${o.status}</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400">Admin/Bot Reply: ${o.adminReply || 'Processing...'}</p>
+                            <p class="text-[9px] text-slate-500">${new Date(o.createdAt).toLocaleString()}</p>
+                        </div>`;
+                    });
+                }
+
+                // Render SR Orders if any
+                if (data.srOrders && data.srOrders.length > 0) {
+                    data.srOrders.forEach(s => {
+                        html += `
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-fuchsia-300">📌 SR: ${s.customerName}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold text-amber-400 bg-amber-500/10">${s.status}</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400">Mobile: ${s.mobileNumber}</p>
+                        </div>`;
+                    });
+                }
+
+                if ((!data.regularOrders || data.regularOrders.length === 0) && (!data.srOrders || data.srOrders.length === 0)) {
+                    html = `<p class="text-center text-xs text-slate-500 py-4">No recent orders found.</p>`;
+                }
+
+                document.getElementById('statusBox').innerHTML = html;
+            } else {
+                document.getElementById('statusBox').innerHTML = `<p class="text-xs text-rose-400 text-center">Sync Error: Failed to fetch orders.</p>`;
+            }
+        } catch (err) {
+            document.getElementById('statusBox').innerHTML = `<p class="text-xs text-rose-400 text-center">SYNC ERROR: Network failure.</p>`;
         }
-    }
-
-    async function appRegister() {
-        const name = document.getElementById('regName').value.trim();
-        const customId = document.getElementById('regId').value.trim();
-        const password = document.getElementById('regPass').value.trim();
-        if(!name || !customId || !password) return alert('Please fill all fields!');
-
-        const res = await fetch('/api/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ customId, password, name }) });
-        const data = await res.json();
-        alert(data.message);
-        if(data.success) switchTab('login');
-    }
-
-    function showDash(user) {
-        currentUser = user;
-        document.getElementById('auth-container').classList.add('hidden');
-        document.getElementById('app-dashboard').classList.remove('hidden');
-        document.getElementById('dName').innerText = user.customId || user.name;
-        document.getElementById('dCoins').innerText = user.jpwCoins !== undefined ? user.jpwCoins.toFixed(2) : '0.00';
-    }
-
-    function logout() {
-        localStorage.clear();
-        location.reload();
     }
 
     async function claimBonus() {
-        const res = await fetch('/api/claim-daily-bonus', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId }) });
-        const data = await res.json();
-        if(data.success) {
-            alert(`🎉 Daily Bonus Claimed! +${data.randomBonus} Coins`);
-            currentUser.jpwCoins = data.user.jpwCoins;
-            document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
-        } else {
-            alert(data.message);
-        }
-    }
-
-    async function initiatePayment(amount, coins) {
+        const telegramChatId = localStorage.getItem('jpw_chat_id');
+        if(!telegramChatId) return alert('Session not found!');
         try {
-            const res = await fetch('/api/pay', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId, amount, coins }) });
+            const res = await fetch('/api/claim-daily-bonus', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegramChatId })
+            });
             const data = await res.json();
-            if(data.success && data.paymentSessionId) {
-                let checkoutOptions = { paymentSessionId: data.paymentSessionId, redirectTarget: "_self" };
-                cashfree.checkout(checkoutOptions);
-            } else {
-                alert(data.message || 'Payment initialization failed');
-            }
+            alert(data.message || `Bonus Claimed: +${data.randomBonus} Coins!`);
+            if(data.success) loadMiniAppAuth(telegramChatId);
         } catch(e) {
-            alert('Connection error during payment setup.');
-        }
-    }
-
-    async function submitReachOrder() {
-        const targetId = document.getElementById('targetId').value.trim();
-        const targetPass = document.getElementById('targetPass').value.trim();
-        if(!targetId || !targetPass) return alert('Fill all fields!');
-
-        const res = await fetch('/api/order', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId, targetId, targetPass }) });
-        const data = await res.json();
-        alert(data.message);
-        if(data.success) {
-            document.getElementById('targetId').value = '';
-            document.getElementById('targetPass').value = '';
-            currentUser.jpwCoins = data.remainingCoins;
-            document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
-            switchSubTab('status');
-        }
-    }
-
-    async function submitSrOrder() {
-        const customerName = document.getElementById('srName').value.trim();
-        const mobileNumber = document.getElementById('srMobile').value.trim();
-        const landlineNumber = document.getElementById('srLandline').value.trim();
-        if(!customerName || !mobileNumber) return alert('Fill required fields!');
-
-        const res = await fetch('/api/sr-submit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: currentUser.telegramChatId, customerName, mobileNumber, landlineNumber }) });
-        const data = await res.json();
-        alert(data.message);
-        if(data.success) {
-            document.getElementById('srName').value = '';
-            document.getElementById('srMobile').value = '';
-            document.getElementById('srLandline').value = '';
-            currentUser.jpwCoins = data.remainingCoins;
-            document.getElementById('dCoins').innerText = currentUser.jpwCoins.toFixed(2);
-            switchSubTab('status');
-        }
-    }
-
-    async function fetchStatus() {
-        const chatId = localStorage.getItem('chatid');
-        if(!chatId) return;
-
-        const listDiv = document.getElementById('statusList');
-        listDiv.innerHTML = '<p class="text-center text-[10px] text-slate-500 py-4 uppercase">Syncing server data...</p>';
-
-        try {
-            const res = await fetch('/api/app/check-status', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: chatId }) });
-            const data = await res.json();
-            
-            let html = '';
-            if(data.regularOrders) {
-                data.regularOrders.forEach(o => {
-                    let badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
-                    if(o.status === 'Completed') badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-                    if(o.status === 'Rejected') badgeColor = 'bg-red-500/10 text-red-400 border-red-500/30';
-                    
-                    html += `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="font-bold text-cyan-300">⚡ Reach: ${o.targetId}</span>
-                            <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold ${badgeColor}">${o.status}</span>
-                        </div>
-                        ${o.adminReply ? `<div class="mt-1 text-sky-300 text-[11px]">💬 Reply: ${o.adminReply}</div>` : ''}
-                    </div>`;
-                });
-            }
-
-            if(data.srOrders) {
-                data.srOrders.forEach(s => {
-                    let badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
-                    if(s.status === 'Completed') badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-                    if(s.status === 'Rejected') badgeColor = 'bg-red-500/10 text-red-400 border-red-500/30';
-
-                    html += `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="font-bold text-indigo-300">📌 SR: ${s.customerName}</span>
-                            <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold ${badgeColor}">${s.status}</span>
-                        </div>
-                    </div>`;
-                });
-            }
-
-            listDiv.innerHTML = html || '<div class="text-center py-4 text-slate-500 text-[10px] uppercase">No active records found</div>';
-        } catch (e) {
-            listDiv.innerHTML = '<p class="text-center text-xs text-red-400 py-4">Sync error.</p>';
+            alert('Error claiming bonus.');
         }
     }
 </script>
