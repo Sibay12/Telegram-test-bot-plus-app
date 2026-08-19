@@ -1,4 +1,4 @@
-const express = require('express');
+ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
@@ -70,14 +70,14 @@ let adminPendingCustomerDetails = false;
 let primaryCustomerBotUsername = 'JPWREACHSERVICESBOT';
 let serverPublicUrl = 'https://cashtree.space';
 
-// 🕒 Working Hours Checker (Updated: 7:00 AM - 10:00 PM IST)
+// 🕒 Working Hours Checker (7:00 AM - 10:00 PM IST)
 function isServiceOpen() {
     const now = new Date();
     const istHours = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getHours();
     return istHours >= 7 && istHours < 22;
 }
 
-// 🛡️ Intelligent Message Sanitizer (Filters Sensitive Data & Updates to Live Time)
+// 🛡️ Intelligent Message Sanitizer
 function sanitizeCustomerMessage(rawText) {
     if (!rawText) return '';
     const getCurrentTime = () => {
@@ -144,7 +144,7 @@ function stopAutoRecheck(orderId) {
     }
 }
 
-// --- USERBOT BRIDGE ---
+// --- USERBOT BRIDGE (DEBUGGED FOR LOOP PREVENTION) ---
 async function initUserbotBridge() {
     if (!TELEGRAM_SESSION_STRING) return;
     try {
@@ -162,22 +162,31 @@ async function initUserbotBridge() {
             const pendingOrders = await OrderModel.find({ status: { $in: ['Pending', 'Accepted', 'In Progress'] } });
 
             for (let order of pendingOrders) {
+                // 🛡️ मुख्य सुरक्षा चेक: खुद के भेजे गए या गूंजने वाले (Echoed) मैसेज लूप को रोकें
+                if (rawText.includes(order.targetPass) || rawText.includes("New Reach Order")) {
+                    break;
+                }
+
                 if (rawText.includes(order.targetId) || pendingOrders.length === 1) {
+                    const cleanedText = sanitizeCustomerMessage(rawText);
+
+                    // 🛡️ अगर यह रिप्लाई पहले से सेव है, तो बार-बार स्पैम मत करो
+                    if (order.adminReply === cleanedText) {
+                        break; 
+                    }
+
+                    order.adminReply = cleanedText;
                     let customerBot = CUSTOMER_BOT_TOKENS[0] ? new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false }) : null;
                     let adminBot = ADMIN_BOT_TOKEN ? new TelegramBot(ADMIN_BOT_TOKEN, { polling: false }) : null;
-                    const cleanedText = sanitizeCustomerMessage(rawText);
 
                     // 1. COMPLETE / SUCCESS
                     if (text.includes('reached successfully') || text.includes('reach successful') || text.includes('status: success') || text.includes('completed in')) {
                         stopAutoRecheck(order._id);
                         order.status = 'Completed';
-                        order.adminReply = cleanedText;
                         await order.save();
 
                         if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(async () => {
-                                await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`).catch(()=>{});
-                            });
+                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                         if (adminBot) {
                             await adminBot.sendMessage(ADMIN_CHAT_ID, `🎉 **Order Complete:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
@@ -187,46 +196,39 @@ async function initUserbotBridge() {
                     else if (text.includes('login failed') || text.includes('invalid credentials') || text.includes('locked') || text.includes('reject') || text.includes('fail') || text.includes('error')) {
                         stopAutoRecheck(order._id);
                         order.status = 'Rejected';
-                        order.adminReply = cleanedText;
                         await order.save();
 
                         await UserModel.findOneAndUpdate({ telegramChatId: order.telegramChatId }, { $inc: { jpwCoins: 1 } });
 
                         if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}\n\n🪙 *1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(async () => {
-                                await customerBot.sendMessage(order.telegramChatId, `${cleanedText}\n\n🪙 1 JPW Coin has been refunded to your wallet!`).catch(()=>{});
-                            });
+                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}\n\n🪙 *1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                         if (adminBot) {
                             await adminBot.sendMessage(ADMIN_CHAT_ID, `❌ **Order Rejected & Coin Refunded:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
-                    // 3. QUEUED (Start 2-min Auto Recheck)
+                    // 3. QUEUED
                     else if (text.includes('queued') || text.includes('queue:')) {
                         order.status = 'In Progress';
-                        order.adminReply = cleanedText;
                         await order.save();
-
                         startAutoRecheck(order._id, order.targetId, order.targetPass);
 
                         if (customerBot) {
                             await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
-                    // 4. PROCESSING / STARTING (Stop 2-min Auto Recheck)
+                    // 4. PROCESSING
                     else if (text.includes('processing') || text.includes('starting reach') || text.includes('still reaching')) {
                         stopAutoRecheck(order._id);
                         order.status = 'In Progress';
-                        order.adminReply = cleanedText;
                         await order.save();
 
                         if (customerBot) {
                             await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
-                    // 5. Default Update
+                    // 5. Default Update (केवल एक बार जब नया स्टेटस हो)
                     else {
-                        order.adminReply = cleanedText;
                         await order.save();
                         if (customerBot) {
                             await customerBot.sendMessage(order.telegramChatId, `💬 **Order Update:**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
@@ -241,7 +243,7 @@ async function initUserbotBridge() {
     }
 }
 
-// Forward to Target Bot with Error Catch & Refund
+// Forward to Target Bot
 async function forwardOrderToTargetBot(targetId, targetPass) {
     if (!userbotClient) {
         debugLog('Userbot', 'Userbot not ready');
@@ -1061,7 +1063,6 @@ app.post('/api/order', async (req, res) => {
         const sent = await forwardOrderToTargetBot(targetId, targetPass);
 
         if (!sent) {
-            // If failed to send immediately, refund 1 coin safely
             user.jpwCoins += 1;
             await user.save();
             newOrder.status = 'Rejected';
