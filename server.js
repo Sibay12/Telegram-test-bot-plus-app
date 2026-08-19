@@ -1,4 +1,4 @@
- const express = require('express');
+const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
@@ -70,18 +70,20 @@ let adminPendingCustomerDetails = false;
 let primaryCustomerBotUsername = 'JPWREACHSERVICESBOT';
 let serverPublicUrl = 'https://cashtree.space';
 
-// 🕒 Working Hours Checker (7:00 AM - 10:00 PM IST)
+// 🕒 Working Hours Checker (7:00 AM - 10:00 PM IST) - Strictly Indian Standard Time
 function isServiceOpen() {
     const now = new Date();
     const istHours = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getHours();
     return istHours >= 7 && istHours < 22;
 }
 
-// 🛡️ Intelligent Message Sanitizer
+// 🛡️ Intelligent Message Sanitizer (Filters Sensitive Data & Updates to IST Live Time)
 function sanitizeCustomerMessage(rawText) {
     if (!rawText) return '';
+    
     const getCurrentTime = () => {
         return new Date().toLocaleTimeString('en-IN', {
+            timeZone: 'Asia/Kolkata',
             hour: '2-digit',
             minute: '2-digit',
             hour12: true
@@ -97,11 +99,16 @@ function sanitizeCustomerMessage(rawText) {
                     !lower.includes('valid till') &&
                     !lower.includes('subscription') &&
                     !lower.includes('use money on next reach') &&
-                    !lower.includes('wallet balance:');
+                    !lower.includes('wallet balance:') &&
+                    !lower.includes('work order:') &&
+                    !lower.includes('remaining') &&
+                    !lower.includes('plan');
         })
         .join('\n');
 
     sanitized = sanitized.replace(/\d{1,2}:\d{2}\s?(am|pm|AM|PM)/gi, getCurrentTime());
+    sanitized = sanitized.replace(/(completed in \d+s|\d+\s*min[s]? ago|\d+\s*minute[s]? ago)/gi, `Completed just now (${getCurrentTime()})`);
+
     return sanitized.replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -144,7 +151,7 @@ function stopAutoRecheck(orderId) {
     }
 }
 
-// --- USERBOT BRIDGE (DEBUGGED FOR LOOP PREVENTION) ---
+// --- USERBOT BRIDGE ---
 async function initUserbotBridge() {
     if (!TELEGRAM_SESSION_STRING) return;
     try {
@@ -162,7 +169,6 @@ async function initUserbotBridge() {
             const pendingOrders = await OrderModel.find({ status: { $in: ['Pending', 'Accepted', 'In Progress'] } });
 
             for (let order of pendingOrders) {
-                // 🛡️ मुख्य सुरक्षा चेक: खुद के भेजे गए या गूंजने वाले (Echoed) मैसेज लूप को रोकें
                 if (rawText.includes(order.targetPass) || rawText.includes("New Reach Order")) {
                     break;
                 }
@@ -170,7 +176,6 @@ async function initUserbotBridge() {
                 if (rawText.includes(order.targetId) || pendingOrders.length === 1) {
                     const cleanedText = sanitizeCustomerMessage(rawText);
 
-                    // 🛡️ अगर यह रिप्लाई पहले से सेव है, तो बार-बार स्पैम मत करो
                     if (order.adminReply === cleanedText) {
                         break; 
                     }
@@ -179,8 +184,8 @@ async function initUserbotBridge() {
                     let customerBot = CUSTOMER_BOT_TOKENS[0] ? new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false }) : null;
                     let adminBot = ADMIN_BOT_TOKEN ? new TelegramBot(ADMIN_BOT_TOKEN, { polling: false }) : null;
 
-                    // 1. COMPLETE / SUCCESS
-                    if (text.includes('reached successfully') || text.includes('reach successful') || text.includes('status: success') || text.includes('completed in')) {
+                    // 1. REAL COMPLETE (केवल तब जब 'Status: SUCCESS' या 'Reached successfully' बिना 'completed in' के हो)
+                    if (text.includes('status: success') || (text.includes('reached successfully') && !text.includes('completed in'))) {
                         stopAutoRecheck(order._id);
                         order.status = 'Completed';
                         await order.save();
@@ -193,7 +198,7 @@ async function initUserbotBridge() {
                         }
                     }
                     // 2. REJECT / FAILED / INVALID / LOCKED (Auto-Refund 1 Coin)
-                    else if (text.includes('login failed') || text.includes('invalid credentials') || text.includes('locked') || text.includes('reject') || text.includes('fail') || text.includes('error')) {
+                    else if (text.includes('login failed') || text.includes('invalid credentials') || text.includes('locked') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
                         stopAutoRecheck(order._id);
                         order.status = 'Rejected';
                         await order.save();
@@ -207,27 +212,20 @@ async function initUserbotBridge() {
                             await adminBot.sendMessage(ADMIN_CHAT_ID, `❌ **Order Rejected & Coin Refunded:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
-                    // 3. QUEUED
-                    else if (text.includes('queued') || text.includes('queue:')) {
-                        order.status = 'In Progress';
-                        await order.save();
-                        startAutoRecheck(order._id, order.targetId, order.targetPass);
-
-                        if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
-                        }
-                    }
-                    // 4. PROCESSING
-                    else if (text.includes('processing') || text.includes('starting reach') || text.includes('still reaching')) {
-                        stopAutoRecheck(order._id);
+                    // 3. COMPLETING SOON / IN PROGRESS (जैसे 'Completed in 61s', 'queued', 'processing')
+                    else if (text.includes('completed in') || text.includes('queued') || text.includes('queue:') || text.includes('processing') || text.includes('starting reach') || text.includes('still reaching')) {
                         order.status = 'In Progress';
                         await order.save();
 
+                        if (text.includes('completed in')) {
+                            startAutoRecheck(order._id, order.targetId, order.targetPass);
+                        }
+
                         if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            await customerBot.sendMessage(order.telegramChatId, `⏳ **Order Progress Update:**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
-                    // 5. Default Update (केवल एक बार जब नया स्टेटस हो)
+                    // 4. Default Update
                     else {
                         await order.save();
                         if (customerBot) {
@@ -1033,7 +1031,7 @@ app.post('/api/sr-submit', async (req, res) => {
     }
 });
 
-// AUTO FORWARD TO TARGET BOT VIA USERBOT + AUTO-POLLING + TIME BOUND (7:00 AM - 10:00 PM)
+// AUTO FORWARD TO TARGET BOT VIA USERBOT + AUTO-POLLING + TIME BOUND (7:00 AM - 10:00 PM IST)
 app.post('/api/order', async (req, res) => {
     try {
         // 1. Working Hours Check (7:00 AM - 10:00 PM IST)
