@@ -103,7 +103,8 @@
         <!-- 1. SERVICES TAB -->
         <div id="tabServices" class="space-y-3 mb-2">
             <div class="p-3.5 bg-slate-950 rounded-2xl border border-sky-500/30">
-                <h3 class="text-xs font-bold text-sky-400 uppercase mb-2">⚡ SUBMIT REACH ORDER (1 Coin)</h3>
+                <h3 class="text-xs font-bold text-sky-400 uppercase mb-1">⚡ SUBMIT REACH ORDER (1 Coin)</h3>
+                <p class="text-[10px] text-amber-400 font-bold mb-2">🕒 Service Hours: 7:00 AM to 10:00 PM IST</p>
                 <input type="text" id="targetId" placeholder="Target ID" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-cyan-300">
                 <input type="password" id="targetPass" placeholder="Target Password" class="w-full p-2.5 mb-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-cyan-300">
                 <button onclick="submitReachOrder()" class="w-full py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-xs font-bold text-slate-950">EXECUTE REACH ORDER</button>
@@ -180,7 +181,6 @@
         const savedId = localStorage.getItem('cid');
         const savedPass = localStorage.getItem('cpass');
         if(savedId && savedPass) {
-            // Auto login and fetch real coin balance from database
             try {
                 const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ customId: savedId, password: savedPass }) });
                 const data = await res.json();
