@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPW Admin | Premium Dashboard</title>
+    <title>JPW Admin | Premium Dashboard & Reseller Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
@@ -20,10 +20,10 @@
 </div>
 
 <div id="admin-dashboard" class="hidden max-w-7xl mx-auto">
-    <h1 class="text-3xl font-black text-white mb-8 text-center uppercase tracking-widest">JPW Admin Portal</h1>
+    <h1 class="text-3xl font-black text-white mb-8 text-center uppercase tracking-widest">JPW Admin Portal (Retail & Reseller)</h1>
 
     <!-- Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div class="glass p-6 rounded-2xl border-l-4 border-emerald-500">
             <h3 class="text-slate-400">Total Users</h3>
             <p id="totalUsers" class="text-3xl font-bold text-white">0</p>
@@ -31,6 +31,10 @@
         <div class="glass p-6 rounded-2xl border-l-4 border-sky-500">
             <h3 class="text-slate-400">Pending Orders</h3>
             <p id="pendingOrders" class="text-3xl font-bold text-white">0</p>
+        </div>
+        <div class="glass p-6 rounded-2xl border-l-4 border-fuchsia-500">
+            <h3 class="text-slate-400">Priority Reseller Orders</h3>
+            <p id="priorityOrders" class="text-3xl font-bold text-white">0</p>
         </div>
         <div class="glass p-6 rounded-2xl border-l-4 border-amber-500">
             <h3 class="text-slate-400">Total Revenue Estimate</h3>
@@ -40,7 +44,7 @@
 
     <!-- Users Management Table -->
     <div class="glass p-6 rounded-3xl mb-8">
-        <h3 class="text-xl font-bold mb-4 text-sky-400">👤 User Coin Management</h3>
+        <h3 class="text-xl font-bold mb-4 text-sky-400">👤 User & Reseller Coin Management</h3>
         <div class="overflow-x-auto">
             <table class="w-full text-left">
                 <thead>
@@ -57,7 +61,26 @@
         </div>
     </div>
 
-    <!-- Announcements -->
+    <!-- Live Orders Table (Includes Priority / Reseller Orders) -->
+    <div class="glass p-6 rounded-3xl mb-8">
+        <h3 class="text-xl font-bold mb-4 text-fuchsia-400">⚡ Live Reach Orders (Retail & Reseller Bulk)</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="text-slate-400 border-b border-slate-700">
+                        <th class="p-3">Chat ID</th>
+                        <th class="p-3">Target ID</th>
+                        <th class="p-3">Type</th>
+                        <th class="p-3">Status</th>
+                        <th class="p-3">Date</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-table"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Announcements & Danger Zone -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="glass p-6 rounded-3xl">
             <h3 class="text-lg font-bold mb-3 text-emerald-400">📢 Global Announcement</h3>
@@ -98,6 +121,7 @@
         // Update Stats
         document.getElementById('totalUsers').innerText = data.users.length;
         document.getElementById('pendingOrders').innerText = data.orders.filter(o => o.status === 'Pending').length;
+        document.getElementById('priorityOrders').innerText = data.orders.filter(o => o.isPriority).length;
 
         // User Table
         let userHtml = '';
@@ -117,6 +141,19 @@
             </tr>`;
         });
         document.getElementById('users-table').innerHTML = userHtml;
+
+        // Orders Table
+        let orderHtml = '';
+        data.orders.slice(0, 15).forEach(ord => {
+            orderHtml += `<tr class="table-row border-b border-slate-700 text-xs">
+                <td class="p-3 text-sky-300">${ord.telegramChatId}</td>
+                <td class="p-3 font-bold">${ord.targetId}</td>
+                <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${ord.isPriority ? 'bg-fuchsia-500/20 text-fuchsia-400' : 'bg-sky-500/20 text-sky-400'}">${ord.isPriority ? 'Reseller Bulk' : 'Retail'}</span></td>
+                <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${ord.status==='Completed'?'bg-emerald-500/20 text-emerald-400':ord.status==='Rejected'?'bg-rose-500/20 text-rose-400':'bg-amber-500/20 text-amber-400'}">${ord.status}</span></td>
+                <td class="p-3 text-slate-400">${new Date(ord.createdAt).toLocaleTimeString()}</td>
+            </tr>`;
+        });
+        document.getElementById('orders-table').innerHTML = orderHtml;
     }
 
     async function updateCoins(userId, action, count) {
