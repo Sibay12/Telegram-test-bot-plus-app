@@ -195,7 +195,7 @@ async function initUserbotBridge() {
                         }
                     }
                     // 2. REJECT / FAILED / LOCKED / ALERT LS (Auto-Refund 1 Coin)
-                    else if (text.includes('locked') || text.includes('alert ls') || text.includes('login failed') || text.includes('invalid credentials') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
+                    else if (text.includes('locked') || text.includes('alert ls') || text.includes('account is locked') || text.includes('login failed') || text.includes('invalid credentials') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
                         stopAutoRecheck(order._id);
                         order.status = 'Rejected';
                         await order.save();
@@ -203,10 +203,10 @@ async function initUserbotBridge() {
                         await UserModel.findOneAndUpdate({ telegramChatId: order.telegramChatId }, { $inc: { jpwCoins: 1 } });
 
                         if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `${cleanedText}\n\n🪙 *Order Closed / Locked! 1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            await customerBot.sendMessage(order.telegramChatId, `❌ **Order Closed / Account Locked!**\n\n${cleanedText}\n\n🪙 *1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                         if (adminBot) {
-                            await adminBot.sendMessage(ADMIN_CHAT_ID, `❌ **Order Rejected & Coin Refunded:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            await adminBot.sendMessage(ADMIN_CHAT_ID, `❌ **Order Locked/Failed & Coin Refunded:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
                     // 3. IN PROGRESS / COMPLETING SOON
@@ -797,7 +797,7 @@ function startAdminBot(token) {
     } catch(e) {}
 }
 
-// 🤖 Customer Bot Management (Updated with Direct Chat Order & Target Lock Support)
+// 🤖 Customer Bot Management
 function startCustomerBot(token, isPrimary) {
     try {
         const bot = new TelegramBot(token, { polling: true });
@@ -831,7 +831,7 @@ function startCustomerBot(token, isPrimary) {
                             [{ text: "🪙 Check Balance", callback_data: "bot_menu_balance" }, { text: "🎁 Daily Bonus", callback_data: "bot_menu_bonus" }],
                             [{ text: "📦 Buy Coins Packages", callback_data: "bot_menu_packages" }, { text: "🤝 Share Coins", callback_data: "bot_menu_transfer" }],
                             [{ text: "🔥 Refer & Earn", callback_data: "bot_menu_referral" }, { text: "📜 Terms & Policies", callback_data: "bot_menu_terms" }],
-                            [{ text: "📞 Support / Contact", callback_data: "bot_menu_contact" }]
+                            [{ text: "📞 Support / Contact", callback_data: "bot_menu_contact" }, { text: "💬 WhatsApp Support", url: "https://wa.me/919382856020" }]
                         ]
                     }
                 };
@@ -920,7 +920,7 @@ function startCustomerBot(token, isPrimary) {
                 bot.sendMessage(chatId, `📜 Visit [cashtree.space](https://cashtree.space) for all terms and policies.`, { parse_mode: 'Markdown' });
             } else if (data === 'bot_menu_contact') {
                 bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `📞 Contact admin directly via portal or support group.`, { parse_mode: 'Markdown' });
+                bot.sendMessage(chatId, `📞 Contact admin via WhatsApp: https://wa.me/919382856020`, { parse_mode: 'Markdown' });
             }
         });
     } catch(e) {}
