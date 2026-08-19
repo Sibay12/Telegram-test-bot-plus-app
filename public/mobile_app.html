@@ -192,22 +192,6 @@
             await verifyInstantPayment(tgId, coinsToAdd, orderId);
         }
 
-        // Check Telegram WebApp context first
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
-            const tgUser = window.Telegram.WebApp.initDataUnsafe.user;
-            const chatId = String(tgUser.id);
-            try {
-                const res = await fetch('/api/mini-app/auth', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ telegramChatId: chatId, name: tgUser.first_name }) });
-                const data = await res.json();
-                if(data.success) {
-                    currentUser = data.user;
-                    showDash(currentUser);
-                    return;
-                }
-            } catch(e) {}
-        }
-
-        // Fallback to local storage credentials
         const savedId = localStorage.getItem('cid');
         const savedPass = localStorage.getItem('cpass');
         if(savedId && savedPass) {
@@ -435,13 +419,13 @@
             const data = await res.json();
             
             let html = '';
-            if(data.regularOrders) {
+            if(data.success && data.regularOrders) {
                 data.regularOrders.forEach(o => {
                     let badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
                     if(o.status === 'Completed') badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
                     if(o.status === 'Rejected' || o.status.includes('Cancelled')) badgeColor = 'bg-red-500/10 text-red-400 border-red-500/30';
                     
-                    html += `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                    html += `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs mb-2">
                         <div class="flex justify-between items-center mb-1">
                             <span class="font-bold text-cyan-300">⚡ Reach: ${o.targetId}</span>
                             <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold ${badgeColor}">${o.status}</span>
@@ -451,13 +435,13 @@
                 });
             }
 
-            if(data.srOrders) {
+            if(data.success && data.srOrders) {
                 data.srOrders.forEach(s => {
                     let badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
                     if(s.status === 'Completed') badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
                     if(s.status === 'Rejected') badgeColor = 'bg-red-500/10 text-red-400 border-red-500/30';
 
-                    html += `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                    html += `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs mb-2">
                         <div class="flex justify-between items-center mb-1">
                             <span class="font-bold text-indigo-300">📌 SR: ${s.customerName}</span>
                             <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold ${badgeColor}">${s.status}</span>
