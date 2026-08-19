@@ -229,14 +229,17 @@ async function initUserbotBridge() {
                     let customerBot = CUSTOMER_BOT_TOKENS[0] ? new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false }) : null;
                     let adminBot = ADMIN_BOT_TOKEN ? new TelegramBot(ADMIN_BOT_TOKEN, { polling: false }) : null;
 
-                    // 1. REAL COMPLETE (Success or 'Working on reach')
-                    if (text.includes('working on reach') || text.includes('status: success') || (text.includes('reached successfully') && !text.includes('completed in'))) {
+                    // 1. REAL COMPLETE (Success or 'Processing reach' / 'Working on reach')
+                    if (text.includes('processing reach') || text.includes('working on reach') || text.includes('status: success') || (text.includes('reached successfully') && !text.includes('completed in'))) {
                         stopAutoRecheck(order._id);
                         order.status = 'Completed';
                         await order.save();
 
+                        // 🎯 Customer ke liye aapka bataya hua exact format
+                        const successReplyFormat = `✅ REACHED SUCCESSFULLY\n\n👤 Tech ID: ${order.targetId}\n📊 Status: SUCCESS`;
+
                         if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `🎉 **Your order has been successfully completed and closed!**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            await customerBot.sendMessage(order.telegramChatId, successReplyFormat, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                         if (adminBot) {
                             await adminBot.sendMessage(ADMIN_CHAT_ID, `🎉 **Order Complete:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
@@ -258,7 +261,7 @@ async function initUserbotBridge() {
                         }
                     }
                     // 3. IN PROGRESS / COMPLETING SOON
-                    else if (text.includes('completed in') || text.includes('queued') || text.includes('queue:') || text.includes('processing') || text.includes('starting reach') || text.includes('still reaching')) {
+                    else if (text.includes('completed in') || text.includes('queued') || text.includes('queue:') || text.includes('starting reach') || text.includes('still reaching')) {
                         order.status = 'In Progress';
                         await order.save();
 
