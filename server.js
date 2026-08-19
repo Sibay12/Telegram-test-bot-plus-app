@@ -150,7 +150,6 @@ function stopAutoRecheck(orderId) {
 
 // --- SMART TIMED GREETINGS SYSTEM (Every 40 Mins based on Time & Mood) ---
 function startSmartGreetingsTimer() {
-    // हर 40 मिनट (40 * 60 * 1000 ms) बाद ट्रिगर होगा
     setInterval(async () => {
         try {
             const users = await UserModel.find({ telegramChatId: { $not: /^WEB_/ } });
@@ -187,7 +186,6 @@ function startSmartGreetingsTimer() {
                 ];
             }
 
-            // रैंडम ग्रीटिंग चुनना ताकि हर 40 मिनट पर अलग मैसेज जाए
             const randomMsg = greetingOptions[Math.floor(Math.random() * greetingOptions.length)];
 
             for (let u of users) {
@@ -199,7 +197,7 @@ function startSmartGreetingsTimer() {
         } catch (e) {
             debugLog('Greetings', `❌ Error in greetings timer: ${e.message}`);
         }
-    }, 40 * 60 * 1000); // 40 minutes interval
+    }, 40 * 60 * 1000);
 }
 
 // --- USERBOT BRIDGE ---
@@ -226,10 +224,6 @@ async function initUserbotBridge() {
                 if (rawText.includes(order.targetId) || pendingOrders.length === 1) {
                     
                     const cleanedText = sanitizeCustomerMessage(rawText);
-
-                    if (order.adminReply === cleanedText) {
-                        break; 
-                    }
 
                     order.adminReply = cleanedText;
                     let customerBot = CUSTOMER_BOT_TOKENS[0] ? new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false }) : null;
@@ -330,7 +324,7 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
         initAllBots();
         initUserbotBridge();
         startOrderCleanupTimer();
-        startSmartGreetingsTimer(); // ⏰ हर 40 मिनट वाला ग्रीटिंग्स टाइमर शुरू किया गया
+        startSmartGreetingsTimer();
     })
     .catch(err => debugLog('Database', '❌ DB Error:', err.message));
 
@@ -864,7 +858,7 @@ function startAdminBot(token) {
     } catch(e) {}
 }
 
-// 🤖 Customer Bot Management (Updated with WhatsApp Support Button)
+// 🤖 Customer Bot Management
 function startCustomerBot(token, isPrimary) {
     try {
         const bot = new TelegramBot(token, { polling: true });
@@ -907,7 +901,7 @@ function startCustomerBot(token, isPrimary) {
                 return;
             }
 
-            // 🎯 DIRECT CHAT ORDER PARSER (Direct ID & Password typing support)
+            // 🎯 DIRECT CHAT ORDER PARSER
             const parts = text.split(/\s+/);
             if (parts.length === 2 && !text.startsWith('/')) {
                 const targetId = parts[0].trim();
@@ -918,7 +912,6 @@ function startCustomerBot(token, isPrimary) {
                     return;
                 }
 
-                // Target Specific Lock Check
                 const existingTargetActiveOrder = await OrderModel.findOne({ 
                     targetId: targetId, 
                     status: { $in: ['Pending', 'Accepted', 'In Progress'] } 
@@ -1149,7 +1142,6 @@ app.post('/api/sr-submit', async (req, res) => {
 // AUTO FORWARD TO TARGET BOT VIA USERBOT + AUTO-POLLING + TIME BOUND (7:00 AM - 10:00 PM IST) + TARGET-SPECIFIC LOCK
 app.post('/api/order', async (req, res) => {
     try {
-        // 1. Working Hours Check (7:00 AM - 10:00 PM IST)
         if (!isServiceOpen()) {
             return res.json({
                 success: false,
@@ -1165,7 +1157,6 @@ app.post('/api/order', async (req, res) => {
 
         const trimmedTargetId = String(targetId).trim();
 
-        // 🛡️ Target Specific Active Order Lock Check
         const existingTargetActiveOrder = await OrderModel.findOne({ 
             targetId: trimmedTargetId, 
             status: { $in: ['Pending', 'Accepted', 'In Progress'] } 
@@ -1189,10 +1180,8 @@ app.post('/api/order', async (req, res) => {
 
         const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId: trimmedTargetId, targetPass: targetPass.trim() });
 
-        // Notify Admin
         await notifyAdminAndUser(newOrder, user, `🌐 **New Reach Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${trimmedTargetId}\`\n🔑 Pass: \`${targetPass}\``);
 
-        // Forward to Target Bot
         const sent = await forwardOrderToTargetBot(trimmedTargetId, targetPass);
 
         if (!sent) {
