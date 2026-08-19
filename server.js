@@ -242,8 +242,8 @@ async function initUserbotBridge() {
                             await adminBot.sendMessage(ADMIN_CHAT_ID, `🎉 **Order Complete:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
-                    // 2. REJECT / FAILED / LOCKED / ALERT LS (Auto-Refund 1 Coin)
-                    else if (text.includes('locked') || text.includes('alert ls') || text.includes('account is locked') || text.includes('login failed') || text.includes('invalid credentials') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
+                    // 2. REJECT / FAILED / LOCKED / SECURITY CHECK EDIT / ALERT LS (Auto-Refund 1 Coin)
+                    else if (text.includes('security check') || text.includes('locked') || text.includes('alert ls') || text.includes('account is locked') || text.includes('login failed') || text.includes('invalid credentials') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
                         stopAutoRecheck(order._id);
                         order.status = 'Rejected';
                         await order.save();
@@ -251,10 +251,10 @@ async function initUserbotBridge() {
                         await UserModel.findOneAndUpdate({ telegramChatId: order.telegramChatId }, { $inc: { jpwCoins: 1 } });
 
                         if (customerBot) {
-                            await customerBot.sendMessage(order.telegramChatId, `❌ **Order Closed / Account Locked!**\n\n${cleanedText}\n\n🪙 *1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            await customerBot.sendMessage(order.telegramChatId, `❌ **Order Cancelled / Security Check Failed / Account Locked!**\n\n${cleanedText}\n\n🪙 *1 JPW Coin has been refunded to your wallet!*`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                         if (adminBot) {
-                            await adminBot.sendMessage(ADMIN_CHAT_ID, `❌ **Order Locked/Failed & Coin Refunded:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
+                            await adminBot.sendMessage(ADMIN_CHAT_ID, `❌ **Order Cancelled/Locked & Coin Refunded:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
                     // 3. IN PROGRESS / COMPLETING SOON
@@ -266,10 +266,8 @@ async function initUserbotBridge() {
                             startAutoRecheck(order._id, order.targetId, order.targetPass);
                         }
 
-                        if (!text.includes('security check') && !text.includes('connecting')) {
-                            if (customerBot) {
-                                await customerBot.sendMessage(order.telegramChatId, `⏳ **Order Progress:**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
-                            }
+                        if (customerBot) {
+                            await customerBot.sendMessage(order.telegramChatId, `⏳ **Order Progress:**\n\n${cleanedText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                         }
                     }
                     // 4. Default Update
