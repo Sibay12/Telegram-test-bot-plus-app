@@ -250,21 +250,45 @@
             msgTag.innerText = "Please enter your Telegram Chat ID!";
             return;
         }
-        msgTag.innerText = "Sending OTP to Telegram...";
+        msgTag.innerText = "Checking user & sending OTP...";
 
         try {
+            // First check user existence via check-user-type
+            const checkRes = await fetch('/api/auth/check-user-type', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ identifier: tempChatId })
+            });
+            const checkData = await checkRes.json();
+
+            if (!checkData.success) {
+                msgTag.innerText = checkData.message || "User not found!";
+                return;
+            }
+
+            tempChatId = checkData.telegramChatId; // Sync correct telegram chat id
+
             const res = await fetch('/api/send-otp', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ telegramChatId: tempChatId })
             });
-            const data = await res.json();
-            if(data.success) {
+            
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                msgTag.innerText = "Server Response Error!";
+                return;
+            }
+
+            if(data && data.success) {
                 document.getElementById('web-login-screen').classList.add('hidden');
                 document.getElementById('otp-verify-screen').classList.remove('hidden');
                 document.getElementById('otpMsg').innerText = "";
             } else {
-                msgTag.innerText = data.message || "User not found!";
+                msgTag.innerText = (data && data.message) ? data.message : "Failed to send OTP!";
             }
         } catch(e) {
             msgTag.innerText = "Network Error!";
@@ -286,8 +310,17 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ telegramChatId: tempChatId, otp })
             });
-            const data = await res.json();
-            if(data.success) {
+            
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                msgTag.innerText = "Server Response Error!";
+                return;
+            }
+
+            if(data && data.success) {
                 telegramChatId = data.user.telegramChatId;
                 userName = data.user.name;
                 localStorage.setItem('jpw_chat_id', telegramChatId);
@@ -300,7 +333,7 @@
                 setupReferralLink(data.user.telegramChatId);
                 loadPackages();
             } else {
-                msgTag.innerText = data.message || "Incorrect OTP!";
+                msgTag.innerText = (data && data.message) ? data.message : "Incorrect OTP!";
             }
         } catch(e) {
             msgTag.innerText = "Network Error!";
