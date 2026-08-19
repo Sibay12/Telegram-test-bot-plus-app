@@ -160,7 +160,7 @@ function startSmartGreetingsTimer() {
                 ];
             } else {
                 greetingOptions = [
-                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam ke baad ab aaram kijiye! 🌌",
+                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam के baad ab aaram kijiye! 🌌",
                     "🌙 **Late Night Check!**\n\nService hours close hone wale hain. Apni health ka dhyan rakhein aur achhi neend lein. Good night! 😴"
                 ];
             }
@@ -432,114 +432,10 @@ function startAdminBot(token) {
     } catch(e) {}
 }
 
-// 🤖 Customer Bot Management (Fully Restored & Active)
 function startCustomerBot(token, isPrimary) {
     try {
         const bot = new TelegramBot(token, { polling: true });
         bot.on('polling_error', () => {});
-
-        let currentBotUsername = '';
-        bot.getMe().then(info => {
-            currentBotUsername = info.username;
-            if (isPrimary) primaryCustomerBotUsername = currentBotUsername;
-        }).catch(() => {});
-
-        bot.on('message', async (msg) => {
-            if (!msg || !msg.chat || !msg.text) return;
-            const chatId = String(msg.chat.id);
-            if (chatId === ADMIN_CHAT_ID) return;
-
-            const text = msg.text.trim();
-            const portalUrl = "https://cashtree.space";
-
-            if (text.startsWith('/start') || text.toLowerCase() === 'menu') {
-                let user = await UserModel.findOne({ telegramChatId: chatId });
-                if (!user) {
-                    user = await UserModel.create({ telegramChatId: chatId, name: msg.from.first_name || 'Engineer', jpwCoins: 0 });
-                }
-
-                const keyboard = {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: "🚀 Open Mini App Portal", web_app: { url: portalUrl } }],
-                            [{ text: "⚡ Regular Reach Service", callback_data: "bot_menu_reach" }, { text: "📌 SR Service", callback_data: "bot_menu_sr" }],
-                            [{ text: "🪙 Check Balance", callback_data: "bot_menu_balance" }, { text: "🎁 Daily Bonus", callback_data: "bot_menu_bonus" }],
-                            [{ text: "📦 Buy Coins Packages", callback_data: "bot_menu_packages" }, { text: "🤝 Share Coins", callback_data: "bot_menu_transfer" }],
-                            [{ text: "🔥 Refer & Earn", callback_data: "bot_menu_referral" }, { text: "📜 Terms & Policies", callback_data: "bot_menu_terms" }],
-                            [{ text: "📞 Support / Contact", callback_data: "bot_menu_contact" }, { text: "💬 WhatsApp Support", url: "https://wa.me/919382856020" }]
-                        ]
-                    }
-                };
-
-                await bot.sendMessage(chatId, `✨ **Welcome to JPW Engineer Portal Bot!** 🚀\n\n👤 Engineer: *${user.name}*\n🆔 Chat ID: \`${chatId}\`\n🪙 Coins Balance: *${user.jpwCoins.toFixed(2)} Coins*\n\n👇 *Choose an option:*`, { parse_mode: 'Markdown', ...keyboard });
-                return;
-            }
-
-            const parts = text.split(/\s+/);
-            if (parts.length === 2 && !text.startsWith('/')) {
-                const targetId = parts[0].trim();
-                const targetPass = parts[1].trim();
-
-                if (!isServiceOpen()) {
-                    await bot.sendMessage(chatId, '⛔ हमारी सेवा का समय सुबह 7:00 AM से रात 10:00 PM तक है। कृपया निर्धारित समय के भीतर प्रयास करें।');
-                    return;
-                }
-
-                const existingTargetActiveOrder = await OrderModel.findOne({ 
-                    targetId: targetId, 
-                    status: { $in: ['Pending', 'Accepted', 'In Progress'] } 
-                });
-
-                if (existingTargetActiveOrder) {
-                    await bot.sendMessage(chatId, `⚠️ Stop! यह Target ID (${targetId}) अभी पहले से प्रोसेस में है।`);
-                    return;
-                }
-
-                let user = await UserModel.findOne({ telegramChatId: chatId });
-                if (!user || user.jpwCoins < 1) {
-                    await bot.sendMessage(chatId, '❌ Insufficient JPW Coins!');
-                    return;
-                }
-
-                user.jpwCoins -= 1;
-                await user.save();
-
-                const newOrder = await OrderModel.create({ telegramChatId: chatId, targetId, targetPass });
-                await notifyAdminAndUser(newOrder, user, `🌐 **New Direct Chat Order (Pending)**\n💬 Chat ID: \`${chatId}\`\n🎯 ID: \`${targetId}\``);
-                const sent = await forwardOrderToTargetBot(targetId, targetPass);
-
-                if (!sent) {
-                    user.jpwCoins += 1;
-                    await user.save();
-                    newOrder.status = 'Rejected';
-                    await newOrder.save();
-                    await bot.sendMessage(chatId, '⚠️ बॉट से संपर्क नहीं हो सका। आपका 1 कॉइन वापस कर दिया गया है।');
-                    return;
-                }
-
-                await bot.sendMessage(chatId, `✅ **Order Placed Successfully via Direct Chat!**\n🎯 Target ID: \`${targetId}\`\n🪙 Remaining Coins: *${user.jpwCoins.toFixed(2)}*`, { parse_mode: 'Markdown' });
-                return;
-            }
-        });
-
-        bot.on('callback_query', async (query) => {
-            const chatId = String(query.message.chat.id);
-            if (chatId === ADMIN_CHAT_ID) return;
-            const data = query.data;
-            const portalUrl = "https://cashtree.space";
-            let user = await UserModel.findOne({ telegramChatId: chatId });
-
-            if (data === 'bot_menu_reach' || data === 'bot_menu_sr' || data === 'bot_menu_packages') {
-                bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `🚀 Open our Mini App Portal to proceed:\n\n[Open Portal](${portalUrl})`, { parse_mode: 'Markdown' });
-            } else if (data === 'bot_menu_balance') {
-                bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `🪙 Your current balance: *${user ? user.jpwCoins.toFixed(2) : 0} Coins*`, { parse_mode: 'Markdown' });
-            } else if (data === 'bot_menu_contact') {
-                bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `📞 Contact admin via WhatsApp: https://wa.me/919382856020`, { parse_mode: 'Markdown' });
-            }
-        });
     } catch(e) {}
 }
 
@@ -608,7 +504,6 @@ app.post('/api/admin/clear-database', async (req, res) => {
     } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// 👤 REGISTRATION API (Fully Active)
 app.post('/api/register', async (req, res) => {
     try {
         const { customId, password, name } = req.body;
@@ -622,7 +517,7 @@ app.post('/api/register', async (req, res) => {
             telegramChatId: `WEB_${customId}`,
             jpwCoins: 0
         });
-        res.json({ success: true, user });
+        res.json({ success: true, user, message: 'Registration successful!' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -642,56 +537,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-app.post('/api/auth/check-user-type', async (req, res) => {
-    try {
-        const { identifier } = req.body;
-        const user = await UserModel.findOne({ $or: [{ customId: identifier }, { telegramChatId: identifier }] });
-        if(user) res.json({ success: true, telegramChatId: user.telegramChatId });
-        else res.json({ success: false, message: 'User not found!' });
-    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// 🔐 FIXED OTP LOGIN APIs (Fully Operational)
-app.post('/api/send-otp', async (req, res) => {
-    try {
-        let { telegramChatId } = req.body;
-        telegramChatId = String(telegramChatId).trim();
-        let user = await UserModel.findOne({ telegramChatId });
-        if (!user) return res.json({ success: false, message: 'User not registered!' });
-
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        otpStorage[telegramChatId] = { otp, expires: Date.now() + 5 * 60 * 1000 };
-
-        if (CUSTOMER_BOT_TOKENS[0]) {
-            const tempBot = new TelegramBot(CUSTOMER_BOT_TOKENS[0], { polling: false });
-            await tempBot.sendMessage(telegramChatId, `🔐 **Portal Login OTP:** \`${otp}\``, { parse_mode: 'Markdown' });
-        }
-        res.json({ success: true, message: 'OTP sent!' });
-    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-app.post('/api/verify-otp', async (req, res) => {
-    try {
-        let { telegramChatId, otp } = req.body;
-        telegramChatId = String(telegramChatId).trim();
-        
-        if (otp) {
-            const record = otpStorage[telegramChatId];
-            if (!record || record.expires < Date.now() || record.otp !== String(otp).trim()) {
-                return res.json({ success: false, message: 'Invalid or expired OTP!' });
-            }
-            delete otpStorage[telegramChatId];
-        }
-
-        let user = await UserModel.findOne({ telegramChatId });
-        if (user) {
-            res.json({ success: true, user });
-        } else {
-            res.json({ success: false, message: 'User not found!' });
-        }
-    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
 app.post('/api/mini-app/auth', async (req, res) => {
     try {
         let { telegramChatId, name } = req.body;
@@ -701,23 +546,63 @@ app.post('/api/mini-app/auth', async (req, res) => {
     } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-app.post('/api/reseller/orders-status', async (req, res) => {
+// ➕ ADD-ON: Mobile App Status Check API (Fixed Sync Error)
+app.post('/api/app/check-status', async (req, res) => {
     try {
         const { telegramChatId } = req.body;
+        if (!telegramChatId) return res.json({ success: false, message: 'Chat ID required' });
+        
+        const regularOrders = await OrderModel.find({ telegramChatId }).sort({ createdAt: -1 });
+        const srOrders = await SrModel.find({ telegramChatId }).sort({ createdAt: -1 });
+        
+        res.json({ success: true, regularOrders, srOrders });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ➕ ADD-ON: User Passbook / Ledger Statement API
+app.post('/api/user/passbook', async (req, res) => {
+    try {
+        const { telegramChatId } = req.body;
+        if (!telegramChatId) return res.json({ success: false, statement: [] });
+
         const orders = await OrderModel.find({ telegramChatId }).sort({ createdAt: -1 });
-        const completed = orders.filter(o => o.status === 'Completed');
-        const inProgress = orders.filter(o => ['Pending', 'Accepted', 'In Progress'].includes(o.status));
-        const failed = orders.filter(o => ['Rejected', 'Cancelled & Refunded'].includes(o.status));
-        res.json({ success: true, completed, inProgress, failed, all: orders });
-    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
+        let statement = [];
+
+        orders.forEach(o => {
+            let type = 'DEBIT';
+            let title = 'Reach Order';
+            let desc = `Target ID: ${o.targetId}`;
+            let status = o.status;
+            let statusColor = 'text-amber-400';
+
+            if (status === 'Completed') {
+                statusColor = 'text-emerald-400';
+            } else if (status === 'Rejected' || status.includes('Cancelled')) {
+                type = 'CREDIT';
+                title = 'Refund / Cancelled';
+                desc = `Refunded for Target ID: ${o.targetId}`;
+                statusColor = 'text-rose-400';
+            }
+
+            statement.push({
+                type,
+                title,
+                description: desc,
+                amount: '1.00',
+                status,
+                statusColor,
+                date: new Date(o.createdAt).toLocaleString()
+            });
+        });
+
+        res.json({ success: true, statement });
+    } catch (err) {
+        res.status(500).json({ success: false, statement: [] });
+    }
 });
 
-// 📦 RECHARGE PACKAGES API
-app.get('/api/packages', (req, res) => {
-    res.json({ success: true, packages: RECHARGE_PACKAGES });
-});
-
-// 💳 CASHFREE PAYMENT INTEGRATION API (Fixed & Restored)
 app.post('/api/pay', async (req, res) => {
     try {
         const { telegramChatId, amount, coins } = req.body;
@@ -733,15 +618,8 @@ app.post('/api/pay', async (req, res) => {
             order_id: orderId,
             order_amount: parseFloat(amount),
             order_currency: "INR",
-            customer_details: { 
-                customer_id: String(telegramChatId), 
-                customer_phone: "9999999999", 
-                customer_email: "test@jpw.com",
-                customer_name: user ? user.name : "Engineer"
-            },
-            order_meta: { 
-                return_url: `https://cashtree.space/?payment=success&telegramChatId=${telegramChatId}&coins=${coins}&order_id=${orderId}` 
-            }
+            customer_details: { customer_id: String(telegramChatId), customer_phone: "9999999999", customer_email: "test@jpw.com" },
+            order_meta: { return_url: `https://cashtree.space/?payment=success&telegramChatId=${telegramChatId}&coins=${coins}&order_id=${orderId}` }
         });
 
         const options = {
@@ -765,23 +643,15 @@ app.post('/api/pay', async (req, res) => {
                     if (response.statusCode === 200 && json.payment_session_id) {
                         res.json({ success: true, paymentSessionId: json.payment_session_id, orderId });
                     } else {
-                        res.json({ success: false, message: json.message || 'Cashfree API Error' });
+                        res.json({ success: false, message: json.message || 'Error' });
                     }
-                } catch(e) { 
-                    res.status(500).json({ success: false, message: 'JSON Parse Error from Cashfree' }); 
-                }
+                } catch(e) { res.status(500).json({ success: false, message: 'JSON Error' }); }
             });
         });
-
-        reqCashfree.on('error', (err) => { 
-            res.status(500).json({ success: false, message: err.message }); 
-        });
-        
+        reqCashfree.on('error', (err) => { res.status(500).json({ success: false, message: err.message }); });
         reqCashfree.write(postData);
         reqCashfree.end();
-    } catch(err) { 
-        res.status(500).json({ success: false, error: err.message }); 
-    }
+    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 app.post('/api/verify-instant', async (req, res) => {
@@ -799,6 +669,31 @@ app.post('/api/verify-instant', async (req, res) => {
             res.json({ success: true, user });
         } else { res.json({ success: false, message: 'User not found' }); }
     } catch(err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.post('/api/claim-daily-bonus', async (req, res) => {
+    try {
+        const { telegramChatId } = req.body;
+        let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
+        if (!user) return res.json({ success: false, message: 'User not found!' });
+
+        const now = new Date();
+        if (user.lastBonusTime) {
+            const lastBonus = new Date(user.lastBonusTime);
+            if (now.toDateString() === lastBonus.toDateString()) {
+                return res.json({ success: false, message: 'You have already claimed your daily bonus today!' });
+            }
+        }
+
+        const randomBonus = parseFloat((Math.random() * 0.5 + 0.1).toFixed(2));
+        user.jpwCoins += randomBonus;
+        user.lastBonusTime = now;
+        await user.save();
+
+        res.json({ success: true, randomBonus, user });
+    } catch(err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 app.post('/api/order', async (req, res) => {
@@ -825,6 +720,20 @@ app.post('/api/order', async (req, res) => {
         }
         res.json({ success: true, message: 'Order submitted successfully!', remainingCoins: user.jpwCoins });
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.post('/api/sr-submit', async (req, res) => {
+    try {
+        const { telegramChatId, customerName, mobileNumber, landlineNumber } = req.body;
+        let user = await UserModel.findOne({ telegramChatId: String(telegramChatId) });
+        if (!user || user.jpwCoins < 1) {
+            return res.json({ success: false, message: 'Insufficient JPW Coins!' });
+        }
+        user.jpwCoins -= 1;
+        await user.save();
+        const newSr = await SrModel.create({ telegramChatId: String(telegramChatId), customerName, mobileNumber, landlineNumber });
+        res.json({ success: true, message: 'SR order submitted successfully!', remainingCoins: user.jpwCoins });
+    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 // 🔄 SELF-PING KEEPALIVE SYSTEM (10 mins interval)
