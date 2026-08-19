@@ -155,11 +155,11 @@ function startSmartGreetingsTimer() {
             } else if (istHour >= 16 && istHour < 20) {
                 greetingOptions = [
                     "🌆 **Good Evening, Engineer!**\n\nShaam ki chai ka waqt ho chuka hai. Ek cup chai pijiye aur relax hokar baaki ke tasks pure kijiye! ☕",
-                    "🌇 **Evening Vibes!**\n\nDin ka kafi kaam ho chuka hai. Thoda break lijiye aur sham ke orders ko smoothly complete karein. 🍪"
+                    "🌇 **Evening Vibes!**\n\nDin ka kafi kaam ho chuka hai. Thoda break lijiye aur sham के orders ko smoothly complete karein. 🍪"
                 ];
             } else {
                 greetingOptions = [
-                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam ke baad ab aaram kijiye! 🌌",
+                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam के baad ab aaram kijiye! 🌌",
                     "🌙 **Late Night Check!**\n\nService hours close hone wale hain. Apni health ka dhyan rakhein aur achhi neend lein. Good night! 😴"
                 ];
             }
@@ -399,7 +399,7 @@ function startResellerBot(token) {
                 bot.sendMessage(chatId, `🪙 Your wholesale balance: *${user ? user.jpwCoins.toFixed(2) : 0} Coins*`, { parse_mode: 'Markdown' });
             } else if (data === 'bot_reseller_packages') {
                 bot.answerCallbackQuery(query.id);
-                bot.sendMessage(chatId, `📦 **Wholesale Packages:**\n\n• 10 Coins - ₹95\n• 50 Coins - ₹425\n• 150 Coins (VIP) - ₹1050\n\n👉 Pay via UPI: \`paytmqr281005050101111649980209@paytm\` and send screenshot to WhatsApp: https://wa.me/919382856020`, { parse_mode: 'Markdown' });
+                bot.sendMessage(chatId, `📦 **Wholesale Packages:**\n\n• 10 Coins - ₹95\n• 50 Coins - ₹425\n• 150 Coins (VIP) - ₹1050\n\n👉 Pay via UPI: \`Paytm.s2ujlw0@pty\` and send screenshot to WhatsApp: https://wa.me/919382856020`, { parse_mode: 'Markdown' });
             } else if (data === 'bot_reseller_status') {
                 bot.answerCallbackQuery(query.id);
                 const orders = await OrderModel.find({ telegramChatId: chatId }).sort({ createdAt: -1 }).limit(5);
