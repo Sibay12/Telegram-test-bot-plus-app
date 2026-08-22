@@ -245,7 +245,7 @@ async function initUserbotBridge() {
                         if (resellerBot) await resellerBot.sendMessage(order.telegramChatId, successReplyFormat, { parse_mode: 'Markdown' }).catch(()=>{});
                         if (adminBot) await adminBot.sendMessage(ADMIN_CHAT_ID, `🎉 **Order Complete:** \`${order.targetId}\`\n\n${rawText}`, { parse_mode: 'Markdown' }).catch(()=>{});
                     }
-                    else if (text.includes('security check') || text.includes('locked') || text.includes('alert ls') || text.includes('account is locked') || text.includes('login failed') || text.includes('invalid credentials') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
+                   else if (text.includes('security check') || text.includes('locked') || text.includes('alert ls') || text.includes('account is locked') || text.includes('login failed') || text.includes('invalid credentials') || text.includes('reject') || text.includes('fail') || text.includes('error') || text.includes('status: fail')) {
                         stopAutoRecheck(order._id);
                         order.status = 'Rejected';
                         await order.save();
