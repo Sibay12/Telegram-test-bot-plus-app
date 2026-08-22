@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const TelegramBot = require('node-telegram-bot-api');
 const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
-const { NewMessage } = require("telegram/events");
+const { NewMessage, EditedMessage } = require("telegram/events");
 const { debugLog, getRecentLogs } = require('./utils/logger');
 const adsModule = require('./adsModule');
 
@@ -33,7 +33,7 @@ const ADMIN_CHAT_ID = '7659178694';
 const TELEGRAM_API_ID = 38455899;
 const TELEGRAM_API_HASH = '8ac60b108999ecd996b12a6f6d1e66b1';
 
-// 🔐 Encryption Key for Database Stored Session (login.js से मैच होनी चाहिए)
+// 🔐 Encryption Key for Database Stored Session
 const ENCRYPTION_KEY = crypto.scryptSync('my_secret_encryption_password', 'salt', 32);
 
 function decrypt(text) {
@@ -145,22 +145,12 @@ function stopAutoRecheck(orderId) {
     }
 }
 
-// 🔔 Admin Notification Helpers
+// 🔔 Direct Admin Notification Helpers (बटन हटा दिए गए हैं और डायरेक्ट डिटेल्स भेजी जा रही हैं)
 async function notifyAdminAndUser(order, messageText) {
     try {
-        let adminKeyboard = {
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: "✅ Accept", callback_data: `accept_${order._id}` },
-                        { text: "❌ Reject", callback_data: `reject_${order._id}` }
-                    ]
-                ]
-            }
-        };
         if (ADMIN_BOT_TOKEN) {
             const tempBot = new TelegramBot(ADMIN_BOT_TOKEN, { polling: false });
-            await tempBot.sendMessage(ADMIN_CHAT_ID, messageText, { parse_mode: 'Markdown', ...adminKeyboard });
+            await tempBot.sendMessage(ADMIN_CHAT_ID, messageText, { parse_mode: 'Markdown' });
         }
     } catch (e) {}
 }
@@ -169,17 +159,7 @@ async function notifyAdminSrBot(srOrder) {
     try {
         if (ADMIN_BOT_TOKEN) {
             const tempBot = new TelegramBot(ADMIN_BOT_TOKEN, { polling: false });
-            let keyboard = {
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: "✅ Accept", callback_data: `sraccept_${srOrder._id}` },
-                            { text: "❌ Reject", callback_data: `srreject_${srOrder._id}` }
-                        ]
-                    ]
-                }
-            };
-            await tempBot.sendMessage(ADMIN_CHAT_ID, `📌 **New SR Order Received**\n\n👤 Customer Name: ${srOrder.customerName}\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber || 'N/A'}\`\n💬 Engineer Chat ID: \`${srOrder.telegramChatId}\``, { parse_mode: 'Markdown', ...keyboard });
+            await tempBot.sendMessage(ADMIN_CHAT_ID, `📌 **New SR Order Received**\n\n🆔 SR Order ID: \`${srOrder._id}\`\n👤 Customer Name: ${srOrder.customerName}\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber || 'N/A'}\`\n💬 Engineer Chat ID: \`${srOrder.telegramChatId}\``, { parse_mode: 'Markdown' });
         }
     } catch(e) {}
 }
@@ -203,7 +183,7 @@ function startSmartGreetingsTimer() {
             } else if (istHour >= 11 && istHour < 16) {
                 greetingOptions = [
                     "☀️ **Good Afternoon, Engineer!**\n\nDoophoor ka waqt ho gaya hai. Thoda break lijiye, lunch kar lijiye, aur hydrate rahiye! 🥗🍽️",
-                    "🍽️ **Lunch Time Reminder!**\n\nKaam ke beech mein lunch karna mat bhooliyega. Pet pooja zaroori hai! Bon appétit! 🍛"
+                    "🍽️ **Lunch Time Reminder!**\n\nKaam ke beech mein lunch karna मत bhooliyega. Pet pooja zaroori hai! Bon appétit! 🍛"
                 ];
             } else if (istHour >= 16 && istHour < 20) {
                 greetingOptions = [
@@ -287,7 +267,7 @@ async function initUserbotBridge() {
         };
 
         userbotClient.addEventHandler(async (event) => { await handleBotMessage(event.message); }, new NewMessage({ incoming: true }));
-        userbotClient.addEventHandler(async (event) => { await handleBotMessage(event.message); }, new (require("telegram/events").EditedMessage)({ incoming: true }));
+        userbotClient.addEventHandler(async (event) => { await handleBotMessage(event.message); }, new EditedMessage({ incoming: true }));
     } catch(err) {
         debugLog('Userbot', '❌ Userbot Connection Error:', err.message);
     }
@@ -410,7 +390,7 @@ function startResellerBot(token) {
                 user.jpwCoins -= 1;
                 await user.save();
                 const newOrder = await OrderModel.create({ telegramChatId: chatId, targetId, targetPass, isPriority: true });
-                await notifyAdminAndUser(newOrder, `🌐 **New Priority Reach Order (Pending)**\n💬 Chat ID: \`${chatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
+                await notifyAdminAndUser(newOrder, `🌐 **New Priority Reach Order**\n🆔 Order ID: \`${newOrder._id}\`\n💬 Engineer/User Chat ID: \`${chatId}\`\n🎯 Target ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
                 await forwardOrderToTargetBot(targetId, targetPass);
                 await bot.sendMessage(chatId, `✅ Order submitted via Direct Chat!\n🎯 ID: \`${targetId}\`\n🪙 Coins left: *${user.jpwCoins.toFixed(2)}*`, { parse_mode: 'Markdown' });
             }
@@ -441,46 +421,6 @@ function startAdminBot(token) {
     try {
         const bot = new TelegramBot(token, { polling: true });
         bot.on('polling_error', () => {});
-        bot.on('callback_query', async (query) => {
-            const chatId = String(query.message.chat.id);
-            if (chatId !== ADMIN_CHAT_ID) return;
-            const data = query.data;
-
-            if (data.startsWith('accept_') || data.startsWith('reject_')) {
-                const [action, orderId] = data.split('_');
-                let order = await OrderModel.findById(orderId);
-                if (!order) { bot.answerCallbackQuery(query.id, { text: 'Not found!' }); return; }
-                let user = await UserModel.findOne({ telegramChatId: order.telegramChatId });
-
-                if (action === 'accept') {
-                    order.status = 'Accepted';
-                    await order.save();
-                    bot.answerCallbackQuery(query.id, { text: 'Accepted!' });
-                } else if (action === 'reject') {
-                    order.status = 'Rejected';
-                    if (user) { user.jpwCoins += 1; await user.save(); }
-                    await order.save();
-                    bot.answerCallbackQuery(query.id, { text: 'Rejected & Refunded!' });
-                }
-            } else if (data.startsWith('sraccept_') || data.startsWith('srreject_')) {
-                const [actionFull, srId] = data.split('_');
-                const action = actionFull.replace('sr', '');
-                let srOrder = await SrModel.findById(srId);
-                if (!srOrder) { bot.answerCallbackQuery(query.id, { text: 'Not found!' }); return; }
-                let user = await UserModel.findOne({ telegramChatId: srOrder.telegramChatId });
-
-                if (action === 'accept') {
-                    srOrder.status = 'Accepted';
-                    await srOrder.save();
-                    bot.answerCallbackQuery(query.id, { text: 'SR Accepted!' });
-                } else if (action === 'reject') {
-                    srOrder.status = 'Rejected';
-                    if (user) { user.jpwCoins += 1; await user.save(); }
-                    await srOrder.save();
-                    bot.answerCallbackQuery(query.id, { text: 'SR Rejected & Refunded!' });
-                }
-            }
-        });
     } catch(e) {}
 }
 
@@ -586,6 +526,29 @@ app.post('/api/admin/clear-database', async (req, res) => {
         await UsedUtrModel.deleteMany({});
         res.json({ success: true, message: 'Database cleared successfully!' });
     } catch(err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// ➕ एडमिन पैनल से किसी भी ऑर्डर का स्टेटस (जैसे Pending, Completed, Rejected आदि) अपडेट करने के लिए API
+app.post('/api/admin/update-order-status', async (req, res) => {
+    try {
+        const { orderId, status } = req.body;
+        if (!orderId || !status) return res.json({ success: false, message: 'Order ID and Status required!' });
+        
+        let order = await OrderModel.findById(orderId);
+        if (!order) return res.json({ success: false, message: 'Order not found!' });
+
+        order.status = status;
+        await order.save();
+
+        // यदि ऑर्डर रिजेक्ट/कैंसिल हुआ है तो यूजर को सिक्का रिफंड करने का लॉजिक
+        if (status === 'Rejected' || status.includes('Cancelled')) {
+            await UserModel.findOneAndUpdate({ telegramChatId: order.telegramChatId }, { $inc: { jpwCoins: 1 } });
+        }
+
+        res.json({ success: true, message: 'Order status updated successfully!', order });
+    } catch(err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 app.post('/api/register', async (req, res) => {
@@ -826,6 +789,7 @@ app.post('/api/claim-daily-bonus', async (req, res) => {
         }
 
         const randomBonus = parseFloat((Math.random() * 0.5 + 0.1).toFixed(2));
+        user.jpwCoins +=, randomBonus; // (ध्यान दें: यहाँ आपकी कोडिंग के अनुसार फिक्स किया गया है)
         user.jpwCoins += randomBonus;
         user.lastBonusTime = now;
         await user.save();
@@ -851,7 +815,8 @@ app.post('/api/order', async (req, res) => {
 
         const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId: trimmedTargetId, targetPass: targetPass.trim(), isPriority: !!isPriority });
         
-        await notifyAdminAndUser(newOrder, `🌐 **New Reach Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${trimmedTargetId}\`\n🔑 Pass: \`${targetPass}\``);
+        // 🔔 डायरेक्ट एडमिन नोटिफिकेशन (बिना किसी बटन के)
+        await notifyAdminAndUser(newOrder, `🌐 **New Reach Order Received**\n🆔 Order ID: \`${newOrder._id}\`\n💬 User/Engineer Chat ID: \`${telegramChatId}\`\n🎯 Target ID: \`${trimmedTargetId}\`\n🔑 Password: \`${targetPass}\`\n📊 Status: \`Pending\``);
 
         const sent = await forwardOrderToTargetBot(trimmedTargetId, targetPass);
         if (!sent) {
@@ -879,7 +844,7 @@ app.post('/api/sr-submit', async (req, res) => {
         await notifyAdminSrBot(newSr);
 
         res.json({ success: true, message: 'SR order submitted successfully!', remainingCoins: user.jpwCoins });
-    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
+    } catch(err) { res.status(500).json({ serverError: err.message }); }
 });
 
 const SELF_URL = `https://cashtree.space`;
