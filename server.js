@@ -33,7 +33,7 @@ const ADMIN_CHAT_ID = '7659178694';
 const TELEGRAM_API_ID = 38455899;
 const TELEGRAM_API_HASH = '8ac60b108999ecd996b12a6f6d1e66b1';
 
-// 🔐 Encryption Key for Database Stored Session
+// 🔐 Encryption Key for Database Stored Session (login.js से मैच होनी चाहिए)
 const ENCRYPTION_KEY = crypto.scryptSync('my_secret_encryption_password', 'salt', 32);
 
 function decrypt(text) {
@@ -198,7 +198,7 @@ function startSmartGreetingsTimer() {
             if (istHour >= 6 && istHour < 11) {
                 greetingOptions = [
                     "🌅 **Good Morning, Engineer!**\n\nHope you had a great sleep. Don't forget to grab your breakfast and coffee before starting today's tech tasks! Have a productive day ahead. ☕🚀",
-                    "☀️ **Good Morning!**\n\nSubah ka waqt fresh energy ka hota hai. Naashta kar lijiye aur taiyar ho jaiye aaj ke naye orders ke liye. Have a wonderful day! 🥐"
+                    "☀️ **Good Morning!**\n\nSubah ka waqt fresh energy ka hota hai. Naashta kar lijiye aur taiyar ho jaiye aaj ke naye orders के liye. Have a wonderful day! 🥐"
                 ];
             } else if (istHour >= 11 && istHour < 16) {
                 greetingOptions = [
@@ -225,7 +225,7 @@ function startSmartGreetingsTimer() {
     }, 40 * 60 * 1000);
 }
 
-// --- USERBOT BRIDGE (Loaded from DB Securely) ---
+// --- USERBOT BRIDGE (Loaded Securely from DB) ---
 async function initUserbotBridge() {
     try {
         const savedDoc = await SavedSessionModel.findOne({ identifier: 'userbot_session' });
