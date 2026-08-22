@@ -145,7 +145,7 @@ function stopAutoRecheck(orderId) {
     }
 }
 
-// 🔔 Direct Admin Notification Helpers (बटन हटा दिए गए हैं और डायरेक्ट डिटेल्स भेजी जा रही हैं)
+// 🔔 Direct Admin Notification Helpers
 async function notifyAdminAndUser(order, messageText) {
     try {
         if (ADMIN_BOT_TOKEN) {
@@ -183,16 +183,16 @@ function startSmartGreetingsTimer() {
             } else if (istHour >= 11 && istHour < 16) {
                 greetingOptions = [
                     "☀️ **Good Afternoon, Engineer!**\n\nDoophoor ka waqt ho gaya hai. Thoda break lijiye, lunch kar lijiye, aur hydrate rahiye! 🥗🍽️",
-                    "🍽️ **Lunch Time Reminder!**\n\nKaam ke beech mein lunch karna मत bhooliyega. Pet pooja zaroori hai! Bon appétit! 🍛"
+                    "🍽️ **Lunch Time Reminder!**\n\nKaam ke beech mein lunch karna mat bhooliyega. Pet pooja zaroori hai! Bon appétit! 🍛"
                 ];
             } else if (istHour >= 16 && istHour < 20) {
                 greetingOptions = [
                     "🌆 **Good Evening, Engineer!**\n\nShaam ki chai ka waqt ho chuka hai. Ek cup chai pijiye aur relax hokar baaki ke tasks pure kijiye! ☕",
-                    "🌇 **Evening Vibes!**\n\nDin ka kafi kaam ho chuka hai. Thoda break lijiye aur sham ke orders ko smoothly complete karein. 🍪"
+                    "🌇 **Evening Vibes!**\n\nDin का kafi kaam ho chuka hai. Thoda break lijiye aur sham के orders ko smoothly complete karein. 🍪"
                 ];
             } else {
                 greetingOptions = [
-                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam ke baad ab aaram kijiye! 🌌",
+                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat कर li aapne aaj. Din bhar ke kaam ke baad ab aaram kijiye! 🌌",
                     "🌙 **Late Night Check!**\n\nService hours close hone wale hain. Apni health ka dhyan rakhein aur achhi neend lein. Good night! 😴"
                 ];
             }
@@ -528,7 +528,6 @@ app.post('/api/admin/clear-database', async (req, res) => {
     } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ➕ एडमिन पैनल से किसी भी ऑर्डर का स्टेटस (जैसे Pending, Completed, Rejected आदि) अपडेट करने के लिए API
 app.post('/api/admin/update-order-status', async (req, res) => {
     try {
         const { orderId, status } = req.body;
@@ -540,7 +539,6 @@ app.post('/api/admin/update-order-status', async (req, res) => {
         order.status = status;
         await order.save();
 
-        // यदि ऑर्डर रिजेक्ट/कैंसिल हुआ है तो यूजर को सिक्का रिफंड करने का लॉजिक
         if (status === 'Rejected' || status.includes('Cancelled')) {
             await UserModel.findOneAndUpdate({ telegramChatId: order.telegramChatId }, { $inc: { jpwCoins: 1 } });
         }
@@ -789,7 +787,6 @@ app.post('/api/claim-daily-bonus', async (req, res) => {
         }
 
         const randomBonus = parseFloat((Math.random() * 0.5 + 0.1).toFixed(2));
-        user.jpwCoins +=, randomBonus; // (ध्यान दें: यहाँ आपकी कोडिंग के अनुसार फिक्स किया गया है)
         user.jpwCoins += randomBonus;
         user.lastBonusTime = now;
         await user.save();
@@ -815,7 +812,6 @@ app.post('/api/order', async (req, res) => {
 
         const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId: trimmedTargetId, targetPass: targetPass.trim(), isPriority: !!isPriority });
         
-        // 🔔 डायरेक्ट एडमिन नोटिफिकेशन (बिना किसी बटन के)
         await notifyAdminAndUser(newOrder, `🌐 **New Reach Order Received**\n🆔 Order ID: \`${newOrder._id}\`\n💬 User/Engineer Chat ID: \`${telegramChatId}\`\n🎯 Target ID: \`${trimmedTargetId}\`\n🔑 Password: \`${targetPass}\`\n📊 Status: \`Pending\``);
 
         const sent = await forwardOrderToTargetBot(trimmedTargetId, targetPass);
@@ -844,7 +840,7 @@ app.post('/api/sr-submit', async (req, res) => {
         await notifyAdminSrBot(newSr);
 
         res.json({ success: true, message: 'SR order submitted successfully!', remainingCoins: user.jpwCoins });
-    } catch(err) { res.status(500).json({ serverError: err.message }); }
+    } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 const SELF_URL = `https://cashtree.space`;
