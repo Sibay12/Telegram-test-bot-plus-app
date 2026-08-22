@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 const TelegramBot = require('node-telegram-bot-api');
 const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
@@ -31,7 +32,19 @@ const ADMIN_CHAT_ID = '7659178694';
 // 🔑 Telegram Userbot MTProto Credentials
 const TELEGRAM_API_ID = 38455899;
 const TELEGRAM_API_HASH = '8ac60b108999ecd996b12a6f6d1e66b1';
-const TELEGRAM_SESSION_STRING = '1BQANOTEuMTA4LjU2LjEzMgG7wbV1tN8uiJlNmwa0DakcabyRVzTLERHbQnMpd9Pf+r/OxQ10aXpYCUmuq5mDn+hOqqbEpQyPBZuMo8U7gvAcRL5fcdPLOFJE069pmIwPho8ldbaDlC/m0VtDVui1jGVtVTV/w2zQmbfIXiw6lnZHQu3q5tqWCSg+ue18BMl1wjDlqE14ZNrczrVMP7ddUWIo5x1CskvLuLV5dF096xEvWc64ieYkL2+tVwigrXR9DIOfC1brU5D1l1GaQPdTH+96ck/3tmViEwo8NRD71lS6FFTptlcVBUVtaQczLoFGc+GbJflwM+MrLExju/coYPLeV0vxJi9eTZjA17IaGIxCgA==';
+
+// 🔐 Encryption Key for Database Stored Session
+const ENCRYPTION_KEY = crypto.scryptSync('my_secret_encryption_password', 'salt', 32);
+
+function decrypt(text) {
+    const textParts = text.split(':');
+    const iv = Buffer.from(textParts.shift(), 'hex');
+    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString('utf8');
+}
 
 const TARGET_THIRD_PARTY_BOT = process.env.TARGET_BOT_USERNAME || '@JPWREACHEDBOT';
 
@@ -132,6 +145,45 @@ function stopAutoRecheck(orderId) {
     }
 }
 
+// 🔔 Admin Notification Helpers
+async function notifyAdminAndUser(order, messageText) {
+    try {
+        let adminKeyboard = {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: "✅ Accept", callback_data: `accept_${order._id}` },
+                        { text: "❌ Reject", callback_data: `reject_${order._id}` }
+                    ]
+                ]
+            }
+        };
+        if (ADMIN_BOT_TOKEN) {
+            const tempBot = new TelegramBot(ADMIN_BOT_TOKEN, { polling: false });
+            await tempBot.sendMessage(ADMIN_CHAT_ID, messageText, { parse_mode: 'Markdown', ...adminKeyboard });
+        }
+    } catch (e) {}
+}
+
+async function notifyAdminSrBot(srOrder) {
+    try {
+        if (ADMIN_BOT_TOKEN) {
+            const tempBot = new TelegramBot(ADMIN_BOT_TOKEN, { polling: false });
+            let keyboard = {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: "✅ Accept", callback_data: `sraccept_${srOrder._id}` },
+                            { text: "❌ Reject", callback_data: `srreject_${srOrder._id}` }
+                        ]
+                    ]
+                }
+            };
+            await tempBot.sendMessage(ADMIN_CHAT_ID, `📌 **New SR Order Received**\n\n👤 Customer Name: ${srOrder.customerName}\n📞 Mobile: \`${srOrder.mobileNumber}\`\n☎️ Landline: \`${srOrder.landlineNumber || 'N/A'}\`\n💬 Engineer Chat ID: \`${srOrder.telegramChatId}\``, { parse_mode: 'Markdown', ...keyboard });
+        }
+    } catch(e) {}
+}
+
 // --- SMART TIMED GREETINGS SYSTEM ---
 function startSmartGreetingsTimer() {
     setInterval(async () => {
@@ -156,11 +208,11 @@ function startSmartGreetingsTimer() {
             } else if (istHour >= 16 && istHour < 20) {
                 greetingOptions = [
                     "🌆 **Good Evening, Engineer!**\n\nShaam ki chai ka waqt ho chuka hai. Ek cup chai pijiye aur relax hokar baaki ke tasks pure kijiye! ☕",
-                    "🌇 **Evening Vibes!**\n\nDin ka kafi kaam ho chuka hai. Thoda break lijiye aur sham के orders ko smoothly complete karein. 🍪"
+                    "🌇 **Evening Vibes!**\n\nDin ka kafi kaam ho chuka hai. Thoda break lijiye aur sham ke orders ko smoothly complete karein. 🍪"
                 ];
             } else {
                 greetingOptions = [
-                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam के बाद अब aaram kijiye! 🌌",
+                    "🌙 **Good Night, Engineer!**\n\nRaat ho chuki hai, kafi mehnat kar li aapne aaj. Din bhar ke kaam ke baad ab aaram kijiye! 🌌",
                     "🌙 **Late Night Check!**\n\nService hours close hone wale hain. Apni health ka dhyan rakhein aur achhi neend lein. Good night! 😴"
                 ];
             }
@@ -173,13 +225,20 @@ function startSmartGreetingsTimer() {
     }, 40 * 60 * 1000);
 }
 
-// --- USERBOT BRIDGE ---
+// --- USERBOT BRIDGE (Loaded from DB Securely) ---
 async function initUserbotBridge() {
-    if (!TELEGRAM_SESSION_STRING) return;
     try {
-        const session = new StringSession(TELEGRAM_SESSION_STRING);
+        const savedDoc = await SavedSessionModel.findOne({ identifier: 'userbot_session' });
+        if (!savedDoc || !savedDoc.encryptedSession) {
+            debugLog('Userbot', '⚠️ No saved session found in database! Please run login script first.');
+            return;
+        }
+
+        const sessionString = decrypt(savedDoc.encryptedSession);
+        const session = new StringSession(sessionString);
         userbotClient = new TelegramClient(session, TELEGRAM_API_ID, TELEGRAM_API_HASH, { connectionRetries: 5 });
         await userbotClient.connect();
+        debugLog('Userbot', '🟢 Personal Telegram Account Connected Successfully from DB Session!');
 
         const handleBotMessage = async (message) => {
             if (!message || message.out) return;
@@ -229,7 +288,9 @@ async function initUserbotBridge() {
 
         userbotClient.addEventHandler(async (event) => { await handleBotMessage(event.message); }, new NewMessage({ incoming: true }));
         userbotClient.addEventHandler(async (event) => { await handleBotMessage(event.message); }, new (require("telegram/events").EditedMessage)({ incoming: true }));
-    } catch(err) {}
+    } catch(err) {
+        debugLog('Userbot', '❌ Userbot Connection Error:', err.message);
+    }
 }
 
 async function forwardOrderToTargetBot(targetId, targetPass) {
@@ -286,10 +347,17 @@ const usedUtrSchema = new mongoose.Schema({
     utrId: { type: String, required: true, unique: true }
 });
 
+const savedSessionSchema = new mongoose.Schema({
+    identifier: { type: String, default: 'userbot_session' },
+    encryptedSession: String,
+    updatedAt: { type: Date, default: Date.now }
+});
+
 const UserModel = mongoose.model('User', userSchema);
 const OrderModel = mongoose.model('Order', orderSchema);
 const SrModel = mongoose.model('SrService', srSchema);
 const UsedUtrModel = mongoose.model('UsedUtr', usedUtrSchema);
+const SavedSessionModel = mongoose.model('SavedSession', savedSessionSchema);
 
 function initAllBots() {
     CUSTOMER_BOT_TOKENS.forEach((token, idx) => { if (token) startCustomerBot(token, idx === 0); });
@@ -341,7 +409,8 @@ function startResellerBot(token) {
                 if (user.jpwCoins < 1) { await bot.sendMessage(chatId, '❌ Insufficient JPW Coins!'); return; }
                 user.jpwCoins -= 1;
                 await user.save();
-                await OrderModel.create({ telegramChatId: chatId, targetId, targetPass, isPriority: true });
+                const newOrder = await OrderModel.create({ telegramChatId: chatId, targetId, targetPass, isPriority: true });
+                await notifyAdminAndUser(newOrder, `🌐 **New Priority Reach Order (Pending)**\n💬 Chat ID: \`${chatId}\`\n🎯 ID: \`${targetId}\`\n🔑 Pass: \`${targetPass}\``);
                 await forwardOrderToTargetBot(targetId, targetPass);
                 await bot.sendMessage(chatId, `✅ Order submitted via Direct Chat!\n🎯 ID: \`${targetId}\`\n🪙 Coins left: *${user.jpwCoins.toFixed(2)}*`, { parse_mode: 'Markdown' });
             }
@@ -372,6 +441,46 @@ function startAdminBot(token) {
     try {
         const bot = new TelegramBot(token, { polling: true });
         bot.on('polling_error', () => {});
+        bot.on('callback_query', async (query) => {
+            const chatId = String(query.message.chat.id);
+            if (chatId !== ADMIN_CHAT_ID) return;
+            const data = query.data;
+
+            if (data.startsWith('accept_') || data.startsWith('reject_')) {
+                const [action, orderId] = data.split('_');
+                let order = await OrderModel.findById(orderId);
+                if (!order) { bot.answerCallbackQuery(query.id, { text: 'Not found!' }); return; }
+                let user = await UserModel.findOne({ telegramChatId: order.telegramChatId });
+
+                if (action === 'accept') {
+                    order.status = 'Accepted';
+                    await order.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Accepted!' });
+                } else if (action === 'reject') {
+                    order.status = 'Rejected';
+                    if (user) { user.jpwCoins += 1; await user.save(); }
+                    await order.save();
+                    bot.answerCallbackQuery(query.id, { text: 'Rejected & Refunded!' });
+                }
+            } else if (data.startsWith('sraccept_') || data.startsWith('srreject_')) {
+                const [actionFull, srId] = data.split('_');
+                const action = actionFull.replace('sr', '');
+                let srOrder = await SrModel.findById(srId);
+                if (!srOrder) { bot.answerCallbackQuery(query.id, { text: 'Not found!' }); return; }
+                let user = await UserModel.findOne({ telegramChatId: srOrder.telegramChatId });
+
+                if (action === 'accept') {
+                    srOrder.status = 'Accepted';
+                    await srOrder.save();
+                    bot.answerCallbackQuery(query.id, { text: 'SR Accepted!' });
+                } else if (action === 'reject') {
+                    srOrder.status = 'Rejected';
+                    if (user) { user.jpwCoins += 1; await user.save(); }
+                    await srOrder.save();
+                    bot.answerCallbackQuery(query.id, { text: 'SR Rejected & Refunded!' });
+                }
+            }
+        });
     } catch(e) {}
 }
 
@@ -414,7 +523,7 @@ function startCustomerBot(token, isPrimary) {
     } catch(e) {}
 }
 
-// --- API ENDPOINTS (FIXED & ADD-ON) ---
+// --- API ENDPOINTS ---
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'admin.html')); });
 app.get('/app', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'mobile_app.html')); });
 app.get('/reseller', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'reseller.html')); });
@@ -575,7 +684,6 @@ app.post('/api/mini-app/auth', async (req, res) => {
     } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ➕ ADD-ON: Mobile App Status Check API
 app.post('/api/app/check-status', async (req, res) => {
     try {
         const { telegramChatId } = req.body;
@@ -590,7 +698,6 @@ app.post('/api/app/check-status', async (req, res) => {
     }
 });
 
-// ➕ ADD-ON: User Passbook / Ledger Statement API
 app.post('/api/user/passbook', async (req, res) => {
     try {
         const { telegramChatId } = req.body;
@@ -632,7 +739,6 @@ app.post('/api/user/passbook', async (req, res) => {
     }
 });
 
-// 📦 RECHARGE PACKAGES API (Added Add-on)
 app.get('/api/packages', (req, res) => {
     res.json({ success: true, packages: RECHARGE_PACKAGES });
 });
@@ -744,6 +850,9 @@ app.post('/api/order', async (req, res) => {
         await user.save();
 
         const newOrder = await OrderModel.create({ telegramChatId: String(telegramChatId), targetId: trimmedTargetId, targetPass: targetPass.trim(), isPriority: !!isPriority });
+        
+        await notifyAdminAndUser(newOrder, `🌐 **New Reach Order (Pending)**\n💬 Chat ID: \`${telegramChatId}\`\n🎯 ID: \`${trimmedTargetId}\`\n🔑 Pass: \`${targetPass}\``);
+
         const sent = await forwardOrderToTargetBot(trimmedTargetId, targetPass);
         if (!sent) {
             user.jpwCoins += 1;
@@ -766,11 +875,13 @@ app.post('/api/sr-submit', async (req, res) => {
         user.jpwCoins -= 1;
         await user.save();
         const newSr = await SrModel.create({ telegramChatId: String(telegramChatId), customerName, mobileNumber, landlineNumber });
+        
+        await notifyAdminSrBot(newSr);
+
         res.json({ success: true, message: 'SR order submitted successfully!', remainingCoins: user.jpwCoins });
     } catch(err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// 🔄 SELF-PING KEEPALIVE SYSTEM (10 mins interval)
 const SELF_URL = `https://cashtree.space`;
 setInterval(() => { 
     https.get(SELF_URL, (res) => {}).on('error', (err) => {}); 
